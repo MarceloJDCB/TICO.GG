@@ -1,2 +1,4 @@
 # TICO.GG
-A simple open source api statistical based for the game "league of legends"
+
+![TICOGG1](https://i.imgur.com/i12rUYb.png)
+![TICOGG2](https://i.imgur.com/LUwuQUq.png)
