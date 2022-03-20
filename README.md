@@ -6,15 +6,16 @@
 
 ##   Vamos começar respondendo algumas perguntas que você possa ter em mente
 
-#### P: Quem é você e por que você resolveu publicar esse protótipo de api baseada em estatística de lol open source?
+#### 1. P: Quem é você e por que você resolveu publicar esse protótipo de api baseada em estatística de lol open source?
 #### R: Meu nome é Marcelo, tenho 20 anos e adoro programar :) . Resolvi fazer este projeto por conta de um insight que tive com um amigo após de descobrir que a api da Riot era aberta para quem quisesse explorar e criar projetos de grande porte ou apenas para uso pessoal, ambos chegamos a conclusão que seria muito diferenciado ter um projeto envolvendo data analysis de lol =D (Descobri pouco tempo depois que iria me custar algumas horas de sono e um pouquinho de cabelo hehehe...)
-#### P: Você é um programador senior?
+#### 2. P: Você é um programador experiente?
 #### R: Não, sendo sincero fiz este protótipo inteiro a base de café, documentações e stackoverflow (e alguns outros sites de artigos de programação).  Você poderá ver ao longo desse repositório que os códigos não são de um programador senior e que podem ser otimizados, erros que podem ser corrigidos , etc...
-#### P: Quem é tico?
+#### 3. P: Quem é tico?
 #### R: Meu doguinho <3
-
-#### P: Por que django?
-#### R: Porque é uma boa tecnologia que eu pretendo masterizar e trabalhar , então preciso de bastante prática e experiências diversas.
+#### 4. P: Por que django?
+#### R: Porque é uma boa tecnologia que eu pretendo masterizar , trabalhar e além de tudo é um framework feito em python (Uma linguagem muito querida por mim) , então preciso de bastante prática e experiências diversas.
+#### 5. P: Por que você escolheu a biblioteca celery para executar requests?
+#### R: Porque é uma excelente biblioteca que nos habilita de um jeito simples a fazer multiplas tarefas ao mesmo tempo. Por exemplo quando pegamos uma lista de 10 partidas em um codigo inline ele executaria cada uma linha por linha esperando uma terminar para começar a outra, com celery conseguimos distribuir essa lista para vários childs de workers disponíveis e executar várias partidas ao mesmo tempo fazendo com que o tempo de espera seja dividido pelos childs e caía drásticamente. A sua implementação não está 100% completa mas no futuro pretendo adicionar alguns comandos interessantes a mais como: Tratamento de erros nas consultas, reiniciar uma tarefa específica quando algo da errado , etc...
 
 ------------
 ## Como faço para ter acesso a API na minha máquina?
