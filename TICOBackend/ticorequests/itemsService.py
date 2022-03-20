@@ -20,7 +20,6 @@ def update_items():
         urlimage = f"http://ddragon.leagueoflegends.com/cdn/{actual_version}/img/item/{id}"
         
         #gold
-        print(name_item,description_item,id,urlimage)
         value_item = data[item_id]['gold']['total']
 
         try:
@@ -35,3 +34,4 @@ def update_items():
         except:
             print("error")
 
+update_items()

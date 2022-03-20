@@ -3,15 +3,23 @@ from .models import runesObject
 
 def save_rune(rune_id,rune_key,rune_icon,rune_name,rune_desc):
     try:
-        obj, created = runesObject.objects.update_or_create(
-            runeId=rune_id,
-            key=rune_key,
-            icon=rune_icon,
-            name=rune_name,
-            description=rune_desc
-        )
+        rune = runesObject.objects.get(runeId=rune_id)
+        rune.key = rune_key
+        rune.icon = rune_icon
+        rune.name = rune_name
+        rune.description = rune_desc
+        rune.save()
     except:
-        print("error")
+        try:
+            obj, created = runesObject.objects.update_or_create(
+                runeId=rune_id,
+                key=rune_key,
+                icon=rune_icon,
+                name=rune_name,
+                description=rune_desc
+            )
+        except:
+            print("error")
 
 def update_runes():
     # CREATING PARAMETERS TO GET THE ACTUAL VERSION OF DATA DRAGON AND LANGUAGE
@@ -44,7 +52,5 @@ def update_runes():
                 save_rune(Id,Key,Icon,Name,Desc)
         
         
-
-
-#update_runes()
+update_runes()
 

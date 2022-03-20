@@ -1,3 +1,4 @@
+from tabnanny import check
 from rest_framework import viewsets, status
 from .serializers import playerSerializer,matchSerializer
 from .models import matchTimeLineObject, playerObject, runesObject,matchObject,itemObject
@@ -9,7 +10,12 @@ import time
 from .tasks import summoner_v4
 from .dictToJson import dictToJson
 from datetime import datetime,timedelta
+from .checkConnection import checkConnection
 
+
+# Delete this and configure what you want
+from .itemsService import update_items
+from .runesService import update_runes
 
 def error_invalid_params():
     error = {"error":"invalid params"}
@@ -22,37 +28,41 @@ class requestPlayerView(APIView):
         params = request.data
         if "name" in params:
             player_name = params['name']
-            summoner_task = summoner_v4.delay(player_name)
-            tasks_not_concluded = False
-            while tasks_not_concluded == False:
-                if summoner_task.ready() == True:
-                    tasks_not_concluded = True
-                    requested_player = playerObject.objects.get(name=player_name)
-                    # LOAD THE DATA FROM THE RANKED
-                    RANKED_TEXT =  requested_player.rankedSolo
-                    data_ranked = dictToJson(RANKED_TEXT)
-                    ##################################################################
-                    # LOAD THE DATA FROM THE MATCHS
-                    MATCH_TEXT =  requested_player.matchs
-                    data_matchs = dictToJson(MATCH_TEXT)
-                    ##################################################################
-                    # LOAD THE STATISTICS FROM THE CHAMPIONS
-                    CHAMPIONS_TEXT = requested_player.championStatistics
-                    data_champions = dictToJson(CHAMPIONS_TEXT)
-                    ###################################################################
-                    player_data = {
-                        "puuid": requested_player.puuid,
-                        "summonerid": requested_player.summonerid,
-                        "name": requested_player.name,
-                        "icon": requested_player.icon,
-                        "level": requested_player.level,
-                        "ranked": data_ranked,
-                        "matchs": data_matchs,
-                        "championStatistics": data_champions
-                    }
-                    return Response(player_data, status.HTTP_200_OK)
-                else:
-                    time.sleep(3)
+            if checkConnection(player_name):
+                summoner_task = summoner_v4.delay(player_name)
+                tasks_not_concluded = False
+                while tasks_not_concluded == False:
+                    if summoner_task.ready() == True:
+                        tasks_not_concluded = True
+                        requested_player = playerObject.objects.get(name=player_name)
+                        # LOAD THE DATA FROM THE RANKED
+                        RANKED_TEXT =  requested_player.rankedSolo
+                        data_ranked = dictToJson(RANKED_TEXT)
+                        ##################################################################
+                        # LOAD THE DATA FROM THE MATCHS
+                        MATCH_TEXT =  requested_player.matchs
+                        data_matchs = dictToJson(MATCH_TEXT)
+                        ##################################################################
+                        # LOAD THE STATISTICS FROM THE CHAMPIONS
+                        CHAMPIONS_TEXT = requested_player.championStatistics
+                        data_champions = dictToJson(CHAMPIONS_TEXT)
+                        ###################################################################
+                        player_data = {
+                            "puuid": requested_player.puuid,
+                            "summonerid": requested_player.summonerid,
+                            "name": requested_player.name,
+                            "icon": requested_player.icon,
+                            "level": requested_player.level,
+                            "ranked": data_ranked,
+                            "matchs": data_matchs,
+                            "championStatistics": data_champions
+                        }
+                        return Response(player_data, status.HTTP_200_OK)
+                    else:
+                        time.sleep(3)
+            else:
+                error = {"error":"Connection to riot api was not successful"}
+                return Response(data=error,status=status.HTTP_503_SERVICE_UNAVAILABLE)
             
         else:
             return error_invalid_params()        
@@ -147,7 +157,7 @@ class runeView(APIView):
             rune_info = {
                 "name":runeobj.name,
                 "icon":runeobj.icon,
-                "desc":runeobj.desc
+                "desc":runeobj.description
             }
             return Response(data=rune_info,status=status.HTTP_200_OK)
             
@@ -156,13 +166,17 @@ class runeView(APIView):
             RUNES = []
             for rune in runes:
                 rune_id = rune['id']
-                runeobj = runesObject.objects.get(runeId=rune_id)
-                rune_info = {
-                "name":runeobj.name,
-                "icon":runeobj.icon,
-                "desc":runeobj.desc
-                }
-                RUNES.append(rune_info)
+                try:
+                    runeobj = runesObject.objects.get(runeId=rune_id)
+                    rune_info = {
+                    "name":runeobj.name,
+                    "icon":runeobj.icon,
+                    "desc":runeobj.description
+                    }
+                    RUNES.append(rune_info)
+                except:
+                    error = {"error":"rune not found in the database"}
+                    RUNES.append(error)
             return Response(data=RUNES,status=status.HTTP_200_OK)
         else:
             return error_invalid_params()
