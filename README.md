@@ -24,6 +24,9 @@
 ### 3. Vá até o diretório da pasta aonde você extraiu a api usando o comando 
 `cd ...TICO.GG\TICOBackend` 
 ### 4. Rode os próximos comandos: 
+
+`python -m venv venv`
+
 `venv\Scripts\activate.bat`
 
 `python manage.py create superuser`  
