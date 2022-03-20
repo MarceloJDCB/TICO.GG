@@ -52,7 +52,83 @@
 
 
 ------------
+## Endpoints e seu uso correto:
 
+- ### requestPlayer
+
+#### input name
+#### output: player info
+#### exemplo de input:
+`{
+"name":"player"
+}`
+
+- ### getMatch
+
+#### input matchid
+#### output: match info
+#### exemplo de input:
+`{
+"matchid":"match_id"
+}`
+#### input matchid e puuid
+#### output: match info do player
+#### exemplo de input:
+`{
+"matchid":"matchid",
+"player":"puuid"
+}`
+
+- ### getTimeLine
+
+#### input matchid
+#### output: match time line info
+#### exemplo de input:
+`{
+"matchid":"match_id"
+}`
+#### input matchid e name
+#### output: time line do player
+#### exemplo de input:
+`{
+"matchid":"matchid",
+"name":"player_name"
+}`
+
+- ### getRune
+
+#### input id
+#### output: rune info
+#### exemplo de input:
+`{
+"id":"rune_id"
+}`
+#### input rune list id
+#### output: runes info
+#### exemplo de input:
+`{
+"runes":[
+{"id":"rune_id1"},
+{"id":"rune_id2"}
+]
+}`
+- ### getItem
+
+#### input id
+#### output: item info
+#### exemplo de input:
+`{
+"id":"item_id"
+}`
+#### input item list id
+#### output: items info
+#### exemplo de input:
+`{
+"items":[
+{"id":"item_id1"},
+{"id":"item_id2"}
+]
+}`
 
 #### Bom por enquanto é isto pessoal, irei continuar atualizando esse repositório conforme avanços no projeto e novos contribuidores :)
 
