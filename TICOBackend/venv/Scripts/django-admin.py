@@ -1,4 +1,4 @@
-#!C:\Users\Marcelo\Documents\Atreyo_Backend\atreyobackend\venv\Scripts\python.exe
+#!C:\Users\Marcelo\Documents\TICO.GG\TICOBackend\venv\Scripts\python.exe
 # When the django-admin.py deprecation ends, remove this script.
 import warnings
 

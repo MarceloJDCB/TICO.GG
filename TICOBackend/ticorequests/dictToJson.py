@@ -1,7 +1,7 @@
 import json
 
 def dictToJson(dict_Text):
-    # ESTA FUNÇÃO SUBSTITUÍ O CARACTERE ' PELO CARACTERE "
+    # THIS FUNCTION REPLACES THE CHARACTER ' BY CHARACTER "
     correct_text = ""
     for i in range(0,len(dict_Text)):
         if dict_Text[i] == "'":

@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
-from kombu import Exchange, Queue
 
 #CELERY
 CELERY_BROKER_URL='amqp://guest:guest@localhost:5672//'

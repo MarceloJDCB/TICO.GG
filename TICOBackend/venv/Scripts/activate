@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\Marcelo\Documents\Atreyo_Backend\atreyobackend\venv"
+VIRTUAL_ENV="C:\Users\Marcelo\Documents\TICO.GG\TICOBackend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
