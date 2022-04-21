@@ -31,7 +31,7 @@ def update_items():
                 value=value_item
                 )
                 
-        except:
-            print("error")
+        except Exception as er:
+            print(er)
 
 update_items()

@@ -5,10 +5,12 @@ import requests
 import time
 import math
 from .models import matchObject,playerObject,matchTimeLineObject
+from celery.result import allow_join_result
+
 
 # CRUCIAL PARAMETERS
-API_KEY = "YOUR_RIOT_API_KEY" # https://developer.riotgames.com/
-PLAYER_MATCH_COUNT = 30 # DEFINES HOW MANY MATCHES THE API WILL TAKE
+API_KEY = "RGAPI-b9cf736b-5df1-4e87-af72-791949f750b1" # https://developer.riotgames.com/
+PLAYER_MATCH_COUNT = 10 # DEFINES HOW MANY MATCHES THE API WILL TAKE
 
 @shared_task
 def player_champion_statistics(PUUID_player):
@@ -190,8 +192,12 @@ def matchv5_timeLine(matchid,requestplayer):
     
    # Catching the participants
     PARTICIPANTS = []
-    for y in range(0,len(response['metadata']['participants'])):
-        PARTICIPANTS.append(playerObject.objects.get(puuid=response['metadata']['participants'][y]))
+    participants = response['metadata']['participants']
+    for puuid in participants:
+        try:
+            PARTICIPANTS.append(playerObject.objects.filter(puuid=puuid).get())
+        except Exception as er:
+            raise(er)
     ################################################################################################
 
     # Catchig the numbers of frames
@@ -247,7 +253,7 @@ def matchv5_timeLine(matchid,requestplayer):
                 if len(EVENTS_ARRAY) == 0:
                     continue
                                    
-    match = matchObject.objects.get(matchId=MATCH_ID)
+    match = matchObject.objects.filter(matchId=MATCH_ID).get()
     newMatchTimeLine = matchTimeLineObject()
     newMatchTimeLine.allEvents = EVENTS_ARRAY
     newMatchTimeLine.match = match
@@ -328,12 +334,11 @@ def matchv5_info(MATCH,NAME):
     
     # GETTING INFO OVER THE MATCHS
     try:
-        matchObject.objects.get(matchId=MATCH)
+        matchObject.objects.filter(matchId=MATCH).get()
         print('Match já existente no bd')
     except:
-        MATCH_V5_INFO = "https://americas.api.riotgames.com/lol/match/v5/matches/" + MATCH + \
-        "?api_key="+API_KEY
-        response = requests.get(MATCH_V5_INFO).json()
+        match_v5_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{MATCH}?api_key={API_KEY}"
+        response = requests.get(match_v5_url).json()
         
         matchv5_timeLine.delay(MATCH,NAME)
         # ID
@@ -355,13 +360,18 @@ def matchv5_info(MATCH,NAME):
             PROFILE_ICON = PARTICIPANTS[k]['profileIcon']
             SUMMONER_LEVEL = PARTICIPANTS[k]['summonerLevel']
             SUMMONER_NAME = PARTICIPANTS[k]['summonerName']
-
-            obj, created = playerObject.objects.get_or_create(
-                puuid=SUMMONER_PUUID,
-                defaults={'puuid': SUMMONER_PUUID,'summonerid':SUMMONER_ID,
-                'name':SUMMONER_NAME.lower(),'icon':PROFILE_ICON,'level':SUMMONER_LEVEL
-                },
-            )
+            try:
+                playerObject.objects.update_or_create(puuid=SUMMONER_PUUID,
+                                                     defaults={
+                                                        'puuid':SUMMONER_PUUID,
+                                                        'summonerid':SUMMONER_ID,
+                                                        'name':SUMMONER_NAME.lower(),
+                                                        'icon':PROFILE_ICON,
+                                                        'level':SUMMONER_LEVEL,})
+            except Exception as er:
+                print(SUMMONER_NAME)
+                pass
+                
             #########################################################
 
             # CHAMPION E ROLE
@@ -530,9 +540,9 @@ def match_v5(PUUID,NAME):
     MATCH_V5 = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{PUUID}/ids?start=0&count={PLAYER_MATCH_COUNT}&api_key={API_KEY}"
     response = requests.get(MATCH_V5).json()
     MATCH_LIST = []
-    for i in range(0,len(response)):
-        MATCH_LIST.append(response[i])
-        matchv5_info.delay(MATCH_LIST[i],NAME)
+    for match in response:
+        MATCH_LIST.append(match)
+        matchv5_info.delay(match,NAME)
     return MATCH_LIST
     ##############################################################
 
@@ -605,17 +615,22 @@ def summoner_v4(player_name):
             time.sleep(3)
         
     # saving a new player in the database
+    with allow_join_result():
+        RANKED_SOLO = QUEUES_INFO.get()
+        MATCHS = MATCH_LIST.get()
+        CHAMPIONSTATISTICS = PLAYER_CHAMPION_STATISTICS.get()
+        
     obj,created = playerObject.objects.update_or_create(puuid=PUUID,
     defaults={
         'puuid':PUUID,
         'summonerid':ID,
-        'name':NAME,
+        'name':NAME.lower(),
         'icon':ICON_ID,
         'level':LEVEL,
-        'rankedSolo':QUEUES_INFO.get(),
-        'matchs':MATCH_LIST.get(),
-        "championStatistics":PLAYER_CHAMPION_STATISTICS.get()
-       })
+        'rankedSolo':RANKED_SOLO,
+        'matchs':MATCHS,
+        "championStatistics":CHAMPIONSTATISTICS
+    })
 
     #############################################################
     

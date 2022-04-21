@@ -1,0 +1,68 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+	<link rel="stylesheet" href="{% static 'fa/css/all.min.css' %}">
+	<script src="{% static 'js/bootstrap.min.js' %}"></script>
+	<style>
+		#title{
+			color:white;
+			text-align:center;
+			font-size:130px;
+			padding-top:18vh
+		}
+	</style>
+	<script>
+		function search_summoner(){
+			let sum_name = document.getElementById("sum_name").value;
+			if(sum_name != ""){
+
+			    window.open("summoner/"+sum_name,'_blank');
+			}
+			else{
+				window.alert("Summoner name cannot be empty")
+			}
+		}
+	</script>
+	<title>Titulo</title>
+</head>
+<body style="background-color:black">
+
+<div class="container">
+	<div style="width:100vh;margin:auto;padding: 1vh;margin-top:25vh;">
+		
+		<div class="row">
+			<div class="col-4">
+			<img style="
+			height: 22vh;
+			-webkit-box-shadow:0px 0px 142px 18px rgba(255,196,20,0.67);
+			-moz-box-shadow: 0px 0px 142px 18px rgba(255,196,20,0.67);
+			box-shadow: 0px 0px 142px 18px rgba(255,196,20,0.67);
+			" src="{% static 'img/ticogg.png' %}"/>
+			</div>
+
+				<hl style="height:20vh;border:1px solid white"></hl>
+
+			<div class="col">
+				<h1 style="color:white;font-size:130px;">
+					Tico.gg
+				</h1>
+			</div>
+		</div>
+
+		<br></br>
+		<div class="input-group mb-3">
+		  <input type="text" id="sum_name" class="form-control" placeholder="Summoner Name" aria-label="Summoner Name" aria-describedby="button-addon2">
+		  <div class="input-group-append">
+		    <button class="btn btn-outline-secondary" onclick="search_summoner()" type="button" id="button-addon2">Search</button>
+		  </div>
+		</div>
+
+	</div>
+</div>
+
+</body>
+</html>

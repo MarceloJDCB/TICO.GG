@@ -1,4 +1,5 @@
-from tabnanny import check
+from django.http import StreamingHttpResponse
+from django.shortcuts import render
 from rest_framework import viewsets, status
 from .serializers import playerSerializer,matchSerializer
 from .models import matchTimeLineObject, playerObject, runesObject,matchObject,itemObject
@@ -11,25 +12,186 @@ from .tasks import summoner_v4
 from .dictToJson import dictToJson
 from datetime import datetime,timedelta
 from .checkConnection import checkConnection
-
-
+from .getMatch import get_match
+from .getPlayerMatch import player_match
+from .randomChampion import gen_champion
 # Delete this and configure what you want
 from .itemsService import update_items
 from .runesService import update_runes
+
+def index(response):
+    print(gen_champion())
+    return render(response,"ticorequests/index.html")
+
+def matchs_unranked(response,summoner):
+    matchs_list = dictToJson(playerObject.objects.filter(puuid=summoner).get().matchs)
+    matchs = []
+    
+    for match in matchs_list:
+        match_info = get_match(match)
+        player_info_in_match = player_match(match,summoner)['participant']
+        
+        kills = player_info_in_match['kills']
+        deaths = player_info_in_match['deaths']
+        assists = player_info_in_match['assists']
+        kda = f"{kills}/{deaths}/{assists}"
+        match_info = {
+            "id":match_info['gameEnding'],
+            "category":match_info['category'],
+            "timeAgo":match_info['timeAgo'],
+            "gameDuration":match_info['gameDuration'],
+            "matchId":match_info['matchId'],
+            "champion":player_info_in_match['champion'],
+            "kda":kda,
+            "win":player_info_in_match['win']
+            
+        }
+        matchs.append(match_info)
+        
+    #matchs = sorted(matchs, key = lambda i: i['id'])  
+    matchs = {"matchs":matchs}
+    return render(response,"ticorequests/matchs.html", matchs)
+
+def matchs(response,summoner):
+    matchs_list = dictToJson(playerObject.objects.filter(puuid=summoner).get().matchs)
+    matchs = []
+    
+    for match in matchs_list:
+        match_info = get_match(match)
+        player_info_in_match = player_match(match,summoner)['participant']
+        
+        kills = player_info_in_match['kills']
+        deaths = player_info_in_match['deaths']
+        assists = player_info_in_match['assists']
+        kda = f"{kills}/{deaths}/{assists}"
+        if match_info['category'] == "Ranked Solo":
+            match_info = {
+                "id":match_info['gameEnding'],
+                "category":match_info['category'],
+                "timeAgo":match_info['timeAgo'],
+                "gameDuration":match_info['gameDuration'],
+                "matchId":match_info['matchId'],
+                "champion":player_info_in_match['champion'],
+                "kda":kda,
+                "win":player_info_in_match['win']
+                
+            }
+            matchs.append(match_info)
+        else: continue
+        
+    if matchs == []:
+        
+        for match in matchs_list:
+            match_info = get_match(match)
+            player_info_in_match = player_match(match,summoner)['participant']
+            
+            kills = player_info_in_match['kills']
+            deaths = player_info_in_match['deaths']
+            assists = player_info_in_match['assists']
+            kda = f"{kills}/{deaths}/{assists}"
+            match_info = {
+                "id":match_info['gameEnding'],
+                "category":match_info['category'],
+                "timeAgo":match_info['timeAgo'],
+                "gameDuration":match_info['gameDuration'],
+                "matchId":match_info['matchId'],
+                "champion":player_info_in_match['champion'],
+                "kda":kda,
+                "win":player_info_in_match['win']}
+            matchs.append(match_info)
+            
+      
+    matchs = {"matchs":matchs}
+    return render(response,"ticorequests/matchs.html", matchs)
+
+def summoner(response,summoner):
+    summoner = summoner.lower()
+    
+    if checkConnection(summoner):
+        summoner_task = summoner_v4.delay(summoner)
+        
+        tasks_not_concluded = False
+        while tasks_not_concluded == False:
+            if summoner_task.ready() == True:
+                player = playerObject.objects.filter(name=summoner).get()
+                rankedsolo = (dictToJson(player.rankedSolo))
+                champions_statistics = dictToJson(player.championStatistics)
+                champion_qtd = 0
+                champion_name = ""
+                for champion in champions_statistics:
+                    ch_qtd = int(champion['qntd'])
+                    if ch_qtd > champion_qtd:
+                        champion_qtd = ch_qtd
+                        champion_name = champion['champion']
+                    else:
+                        continue
+                ranked_solo_info = ""
+                for itens in rankedsolo:
+                    if itens['QUEUE'] == 'RANKED_SOLO_5x5':
+                        tier = itens['TIER']
+                        pdl = itens['LEAGUE_POINTS']
+                        wins = itens['WINS']
+                        losses = itens['LOSSES']
+                        winrate = itens['WINRATE']
+                        w_l = f"{wins}W {losses} L"
+                        ranked_solo_info = {"tier":tier, "pdl":pdl, "wl":w_l,"winrate":winrate}
+                if ranked_solo_info == "":
+                    
+                    champion_name = gen_champion()
+                    player_info = {
+                        "player":player,
+                        "champion_name":champion_name
+                    }
+                    print(player_info)
+                    return render(response,"ticorequests/summonerunranked.html", player_info)
+                    
+                        
+                else:
+                    if champion_name == "":
+                        champion_name = gen_champion()
+                    player_info = {
+                        "player":player,
+                        "champion_name":champion_name
+                    }
+                    print(champion_name)
+                    player_info = dict(player_info,**ranked_solo_info)
+                    return render(response,"ticorequests/summoner.html", player_info)
+            else:
+                time.sleep(1)
+                continue
+            
+    else:
+        return render(response,"ticorequests/error_riot.html")
+    
+    
+    
+    
+    
+
+    
+
+def test(request):
+    rx = playerObject.objects.filter(name="rxrxatiradorrxrx")
+    
+    print(rx)
+    return Response(data=rx)
+
 
 def error_invalid_params():
     error = {"error":"invalid params"}
     print(error)
     return Response(data=error,status=status.HTTP_400_BAD_REQUEST)
 
+
 class requestPlayerView(APIView):
     @api_view(('POST',))
     def request_player(request):
         params = request.data
         if "name" in params:
-            player_name = params['name']
+            player_name = params['name'].lower()
             if checkConnection(player_name):
                 summoner_task = summoner_v4.delay(player_name)
+                
                 tasks_not_concluded = False
                 while tasks_not_concluded == False:
                     if summoner_task.ready() == True:
@@ -59,7 +221,9 @@ class requestPlayerView(APIView):
                         }
                         return Response(player_data, status.HTTP_200_OK)
                     else:
-                        time.sleep(3)
+                        render(request,"ticorequests/loading.html")
+                        continue
+                    
             else:
                 error = {"error":"Connection to riot api was not successful"}
                 return Response(data=error,status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -69,7 +233,8 @@ class requestPlayerView(APIView):
         
 
 class playerViewSet(viewsets.ModelViewSet):
-    queryset = playerObject.objects.all()
+    
+    queryset = playerObject.objects.filter(name="grevzin")
     serializer_class = playerSerializer
    
 class matchViewSet(viewsets.ModelViewSet):
@@ -226,7 +391,7 @@ class matchView(APIView):
             time = (datetime.now() - EndingDate)
             
             days = time.days
-            if days > 1:
+            if days > 0:
                 x = time.seconds / 86400
                 if x > 0.5:
                     timeAgo = str(days + 1) + " days ago"
@@ -234,7 +399,6 @@ class matchView(APIView):
                     timeAgo = str(days) + " days ago"
             else:
                 minutes = time.seconds / 60
-                print(minutes)
                 if minutes < 60:
                     timeAgo = str(minutes) + "minutes ago"
                 elif minutes > 60:
