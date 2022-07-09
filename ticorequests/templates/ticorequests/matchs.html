@@ -1,0 +1,89 @@
+{%load static%}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+	<link rel="stylesheet" href="{% static 'fa/css/all.min.css' %}">
+	<script src="{% static 'js/bootstrap.min.js' %}"></script>
+	<title></title>
+</head>
+<body style="background-color:black;height:100%;width:100%;margin:0px">
+    <div>
+        {% for match in matchs %}
+        {% if match.win == 'false'%}
+        <div 
+        class="row"
+        style="text-align:center; padding: 1px;
+        height:13vh;background-color:rgba(255, 66, 66,0.8);border:1px solid black;color:white;font-size:20px;">
+
+         <div class="col-2" style="background-color:black;border:1px solid white;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+         ">
+            <p style="font-size:12px; ">
+            <span style="width:1px;">{{match.category}}</span><br/>
+            {{match.timeAgo}}
+
+            </p>
+            <hr style='background-color:white'>
+            <p style="font-size:12px">
+            <b style="color:red">lose</b> <br/>
+            {{match.gameDuration}}
+            </p>
+            </div>
+
+            <div class="col-1.5" style="background-color:black;border:1px solid white">
+            <img style="width:7.5vh" src="http://ddragon.leagueoflegends.com/cdn/12.7.1/img/champion/{{match.champion}}.png"/>
+            </div>
+
+      
+        <h4 style="padding:10px">{{match.kda}}</h4>
+
+        
+
+        </div>
+        {% else %}
+
+
+        <div class="row" style="
+        padding: 1px;
+        text-align:center;
+        height:13vh;background-color:rgba(66, 114, 255,0.8);border:1px solid black;color:white;font-size:20px;">
+
+            <div class="col-2" style="
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            background-color:black;border:1px solid white">
+            <p style="font-size:12px;text-overflow: ellipsis; ">
+            {{match.category}}<br/>
+            {{match.timeAgo}}
+
+            </p>
+            <hr style='background-color:white'>
+            <p style="font-size:12px">
+            <b style="color:cyan">win</b><br/>
+            {{match.gameDuration}}<br/>
+    
+           
+            </p>
+            </div>
+
+            <div class="col-1.5" style="background-color:black;border:1px solid white">
+            <img style="width: 7.5vh" src="http://ddragon.leagueoflegends.com/cdn/12.7.1/img/champion/{{match.champion}}.png"/>
+            </div>
+
+    
+        <h4 style="padding:10px">{{match.kda}}</h4>
+
+        </div>
+
+
+        {%endif%}
+        {% endfor %}
+</div>
+</body>
+</html>

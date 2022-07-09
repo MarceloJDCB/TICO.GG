@@ -1,0 +1,112 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+	<link rel="stylesheet" href="{% static 'fa/css/all.min.css' %}">
+	<script src="{% static 'js/bootstrap.min.js' %}"></script>
+	<script src="{% static 'colorthief/dist/color-thief.umd.js' %}"></script>
+
+	<style>
+
+		ul li{
+  	display: inline-block;
+		}
+		body{
+			background-position: center;
+			{% if champion_name == ''%}
+
+			background-image: url("{% static 'img/ticogg.png'%}");
+
+			{% else %}
+			background-image: url('http://ddragon.leagueoflegends.com/cdn/img/champion/splash/{{champion_name}}_0.jpg');
+			{% endif %}
+			background-repeat: no-repeat;
+			background-size: cover;
+		}
+		
+	</style>
+
+	<title>Titulo</title>
+</head>
+<body>
+	
+	<div class="container">
+		<div id="playerheader" style="width:100vh;margin:auto;padding: 1vh;margin-top:25vh;background: rgba(125, 52, 235, 0.8);color:white;text-transform: uppercase;">
+			<div class="row align-items-center">
+    			<div class="col-3">
+					
+					<img height="200" style="border:3px solid white" src="http://ddragon.leagueoflegends.com/cdn/12.7.1/img/profileicon/{{player.icon}}.png"/>
+					
+				</div>
+    			<div style="text-align:left" class="col">
+	    			
+					<h1>{{player.name}}</h1>
+			
+
+	
+
+					<h4>Level {{player.level}}</h4>
+    			</div>
+    			
+			   
+
+  </div>
+		</div>
+
+		<div  style="width:100vh;margin:auto;padding: 1vh;background: rgba(33, 33, 33, 0.8);">
+		<center>
+		<iframe frameborder="0"  scrolling="no" style="width:98vh;height:120vh" src="http://127.0.0.1:8000/getunrankedplayermatchs/{{player.puuid}}/" title="description"></iframe>
+		</center>
+		</div>
+	</div>
+
+
+
+
+		
+</body>
+
+<script>
+    const colorThief = new ColorThief();
+    const img = new Image();
+
+    var predominant_color = "";
+
+    img.addEventListener('load', function() {
+	  	predominant_color = colorThief.getColor(img);
+	  	r = predominant_color[0] + 50
+      	g = predominant_color[1]
+      	b = predominant_color[2]
+      	console.log("rgba(" + r + "," + g + "," + b + ",0.8)")
+      	document.getElementById("playerheader").style.background = "rgba(" + r + "," + g + "," + b + ",0.8)";
+	})
+
+
+	img.crossOrigin = 'Anonymous';
+	img.src = 'http://ddragon.leagueoflegends.com/cdn/img/champion/splash/{{champion_name}}_0.jpg'
+
+
+		/*
+	    // Make sure image is finished loading
+	    if (img.complete) {
+	    	console.log('completo')
+	      	predominant_color = colorThief.getColor(img);
+	      	r = predominant_color[0] + 50
+	      	g = predominant_color[1] + 20
+	      	b = predominant_color[2]
+	      	console.log("rgba(" + r + "," + g + "," + b + ",0.8)")
+	      	document.getElementById("playerheader").style.background = "rgba(" + r + "," + g + "," + b + ",0.8)";
+	    } else {
+	      	img.addEventListener('load', function() {
+        	predominant_color = colorThief.getColor(img);
+      		});
+	    }
+	    */
+	    
+	    
+	</script>
+
+</html>
