@@ -11,29 +11,39 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
-
-#CELERY
-CELERY_BROKER_URL='amqp://guest:guest@localhost:5672//'
-CELERY_POOL_RESTARTS = True
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_BACKEND = 'rpc://guest:guest@localhost:5672//'
-
+import environ
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+env = environ.Env()
+environ.Env.read_env(f"{BASE_DIR}\.env")
+
+#RIOT
+RIOT_API_KEY = env('RIOT_API_KEY')
+PLAYER_MATCH_COUNT = env('PLAYER_MATCH_COUNT')
+BR1_RIOT_API_URL = env('BR1_RIOT_API_URL')
+AMERICAS_RIOT_API_URL = env('AMERICAS_RIOT_API_URL')
+RIOT_DRAGON_CDN_URL = env('RIOT_DRAGON_CDN_URL')
+RIOT_DRAGON_CANISBACK_CDN_URL = env('RIOT_DRAGON_CANISBACK_CDN_URL')
+
+#CELERY
+CELERY_BROKER_URL = env('CELERY_BROKER_URL')
+CELERY_POOL_RESTARTS = env('CELERY_POOL_RESTARTS')
+CELERY_RESULT_SERIALIZER = env('CELERY_RESULT_SERIALIZER')
+CELERY_TASK_SERIALIZER = env('CELERY_TASK_SERIALIZER')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'YOUR_SECRET_KEY'
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 
 # Application definition
@@ -69,10 +79,8 @@ ROOT_URLCONF = 'core.urls'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ORIGIN_WHITELIST = [
-    'https://localhost:8000'
-]
+CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL_ORIGINS')
+CORS_ORIGIN_WHITELIST = env.list('CORS_ORIGIN_WHITELIST')
 
 TEMPLATES = [
     {
@@ -153,3 +161,4 @@ STATIC_URL = '/static/'
 #        "args": (),
 #    },
 #}
+

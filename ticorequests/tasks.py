@@ -4,88 +4,81 @@ import json
 import requests
 import time
 import math
-from .models import matchObject,playerObject,matchTimeLineObject
+from . import models
 from celery.result import allow_join_result
-
-
-# CRUCIAL PARAMETERS
-API_KEY = "RGAPI-b9cf736b-5df1-4e87-af72-791949f750b1" # https://developer.riotgames.com/
-PLAYER_MATCH_COUNT = 10 # DEFINES HOW MANY MATCHES THE API WILL TAKE
+from utils import match
+from integrations.services.riotlolapi import RiotLolService
+from django.core import exceptions
 
 @shared_task
-def player_champion_statistics(PUUID_player):
+def player_champion_statistics(player_puuid):
     class Champion:
         def __init__(self, name, kill, death, assist, win, cs, gameduration):
             self.name = name
             self.kill = float(kill)
             self.death = float(death)
             self.assist = float(assist)
+            self.win = win
             self.cs = cs
             self.gameduration = gameduration
-            self.win = win
 
-    matchs = matchObject.objects.all()
-    newChamps = []
-    for e in range(0,len(matchs)):
-        x = {"matchid":matchs[e].matchId}
-        url = "http://127.0.0.1:8000/getMatch"
-        data = requests.post(url,data=x).json()
+    matchs = models.MatchObject.objects.all()
+    new_champs = []
+    for match_data in matchs:
+        match_utils = match.MatchUtils(match_data.match_id)
+        data = match_utils.get_match_json()
         if data['category'] == "Ranked Solo":
-            for i in range(0,len(data['participants'])):
-                if data['participants'][i]['puuid'] == PUUID_player:
-                    name = data['participants'][i]['champion']
-                    kills = data['participants'][i]['kills']
-                    deaths = data['participants'][i]['deaths']
-                    assists = data['participants'][i]['assists']
-                    cs = float(data['participants'][i]['cs'])
+            for participant in data['participants']:
+                if participant['puuid'] == player_puuid:
+                    name = participant['champion']
+                    kills = participant['kills']
+                    deaths = participant['deaths']
+                    assists = participant['assists']
+                    cs = float(participant['cs'])
 
-                    # GAME DURATION / CATCHING ONLY THE MINUTES IN THIS ACTUAL VERSION OF TICO API
-                    strgameDuration = str(data['gameDuration'])
-                    gameDuration = ""
-                    for y in range(0,len(strgameDuration)):
-                        if strgameDuration[y] == ":":
+                    str_game_duration = str(data['gameDuration'])
+                    game_duration = ""
+                    for char in str_game_duration:
+                        if char == ":":
                             break
                         else:
-                            gameDuration = gameDuration + strgameDuration[y]
-                    gameDuration = float(gameDuration)
-                    ##################################################################
+                            game_duration = game_duration + char
+                    game_duration = float(game_duration)
                     win = data['participants'][i]['win']
-                    newChamps.append(Champion(name,kills,deaths,assists,win,cs,gameDuration))
-                else:
-                    continue
-        else:
-            continue
+                    new_champs.append(Champion(name,kills,deaths,assists,win,cs,game_duration))
         
     # Ordering the champions
     def get_atr_name(c):    
         return c.name
-    newList = []
-    newChamps.sort(key=get_atr_name)
-    for b in range(0,len(newChamps)):
+    new_list = []
+    b = 0
+    new_champs.sort(key=get_atr_name)
+    for champ in new_champs:
+
         #ACTUAL
-        name = newChamps[b].name
-        kills = newChamps[b].kill
-        deaths = newChamps[b].death
-        assists = newChamps[b].assist
-        cs = newChamps[b].cs
-        gameduration = newChamps[b].gameduration
-        win = newChamps[b].win
+        name = champ.name
+        kills = champ.kill
+        deaths = champ.death
+        assists = champ.assist
+        cs = champ.cs
+        gameduration = champ.gameduration
+        win = champ.win
         if b > 0:
             #OLD
-            oldname = newChamps[b-1].name
+            oldname = new_champs[b-1].name
             if name == oldname:
-                for z in range(0,len(newList)):
-                    if newList[z]['champion'] == name:
-                        newList[z]['kills'] = kills + newList[z]['kills']
-                        newList[z]['deaths'] = deaths + newList[z]['deaths']
-                        newList[z]['assists'] = assists + newList[z]['assists']
-                        newList[z]['cs'] = cs + newList[z]['cs']
-                        newList[z]['gameduration'] = gameduration + newList[z]['gameduration']
+                for list in new_list:
+                    if list['champion'] == name:
+                        list['kills'] = kills + list['kills']
+                        list['deaths'] = deaths + list['deaths']
+                        list['assists'] = assists + list['assists']
+                        list['cs'] = cs + list['cs']
+                        list['gameduration'] = gameduration + list['gameduration']
                         if win == "true":
-                            newList[z]['wins'] = newList[z]['wins'] + 1
+                            list['wins'] = list['wins'] + 1
                         else:
-                            newList[z]['losses'] = newList[z]['losses'] + 1
-                        newList[z]['qntd'] = newList[z]['qntd'] + 1
+                            list['losses'] = list['losses'] + 1
+                        list['qntd'] = list['qntd'] + 1
                         break
                     else:
                         continue
@@ -118,7 +111,7 @@ def player_champion_statistics(PUUID_player):
                     "kda":0,
                     "qntd":1
                     }
-                newList.append(x)
+                new_list.append(x)
         else:
             if win == "true":
                 x = {
@@ -148,118 +141,107 @@ def player_champion_statistics(PUUID_player):
                 "kda":0,
                 "qntd":1
                 }
-            newList.append(x)
+            new_list.append(x)
+        b += 1
 
-    for c in range(0,len(newList)):
+    for list in new_list:
        #VARIAVEIS PARA OPERAÇÕES MATEMÁTICAS   
-        newList[c]['kills'] = (round(newList[c]['kills'] / newList[c]['qntd'], 1))
-        newList[c]['deaths'] = (round(newList[c]['deaths'] / newList[c]['qntd'], 1))
-        newList[c]['assists'] = (round(newList[c]['assists'] / newList[c]['qntd'], 1))
-        newList[c]['cs'] = (round(newList[c]['cs'] / newList[c]['gameduration'],1))
-        newList[c]['gameduration'] = (round(newList[c]['gameduration'] / 60, 1))
-        newList[c]['wins'] = (newList[c]['wins'])
-        newList[c]['losses'] = (newList[c]['losses'])
-        newList[c]['qntd'] = (newList[c]['qntd'])
-        newList[c]['winrate'] = ((newList[c]['wins'] / newList[c]['qntd']) * 100)
+        list['kills'] = (round(list['kills'] / list['qntd'], 1))
+        list['deaths'] = (round(list['deaths'] / list['qntd'], 1))
+        list['assists'] = (round(list['assists'] / list['qntd'], 1))
+        list['cs'] = (round(list['cs'] / list['gameduration'],1))
+        list['gameduration'] = (round(list['gameduration'] / 60, 1))
+        list['wins'] = (list['wins'])
+        list['losses'] = (list['losses'])
+        list['qntd'] = (list['qntd'])
+        list['winrate'] = ((list['wins'] / list['qntd']) * 100)
 
         # KDA (Kill/Death/Assistance) is the sum of kills and assists divided by the number of deaths
-        if newList[c]['deaths'] == 0:
-            newList[c]['kda'] = str(newList[c]['assists'] + newList[c]['kills'])
+        if list['deaths'] == 0:
+            list['kda'] = str(list['assists'] + list['kills'])
         else:
-            newList[c]['kda'] = str((newList[c]['assists'] + newList[c]['kills']) / newList[c]['deaths'])[0:4]
+            list['kda'] = str((list['assists'] + list['kills']) / list['deaths'])[0:4]
 
 
         # variables that will be given to the final list
-        newList[c]['kills'] = str(newList[c]['kills'])
-        newList[c]['deaths'] = str(newList[c]['deaths'])
-        newList[c]['assists'] = str(newList[c]['assists'])
-        newList[c]['cs'] = str(newList[c]['cs'])
-        newList[c]['gameduration'] = str(newList[c]['gameduration'])
-        newList[c]['wins'] = str(newList[c]['wins'])
-        newList[c]['losses'] = str(newList[c]['losses'])
-        newList[c]['qntd'] = str(newList[c]['qntd'])
+        list['kills'] = str(list['kills'])
+        list['deaths'] = str(list['deaths'])
+        list['assists'] = str(list['assists'])
+        list['cs'] = str(list['cs'])
+        list['gameduration'] = str(list['gameduration'])
+        list['wins'] = str(list['wins'])
+        list['losses'] = str(list['losses'])
+        list['qntd'] = str(list['qntd'])
         
-        newList[c]['winrate'] = str(newList[c]['winrate'])
+        list['winrate'] = str(list['winrate'])
 
-    return(newList)
+    return(new_list)
 
 
 @shared_task
-def matchv5_timeLine(matchid,requestplayer):
-    MATCH_ID = matchid
-    URL = f"https://americas.api.riotgames.com/lol/match/v5/matches/{MATCH_ID}/timeline?api_key={API_KEY}"
-    response = requests.get(URL).json()
-    
-   # Catching the participants
-    PARTICIPANTS = []
-    participants = response['metadata']['participants']
-    for puuid in participants:
-        try:
-            PARTICIPANTS.append(playerObject.objects.filter(puuid=puuid).get())
-        except Exception as er:
-            raise(er)
-    ################################################################################################
+def matchv5_timeLine(match_id,requestplayer):
+    response = RiotLolService().get_matchv5_timeline(match_id).json()
+    participants = []
+    participants_payload = response['metadata']['participants']
+    for puuid in participants_payload:
+        participants.append(models.PlayerObject.objects.get(puuid=puuid))
 
     # Catchig the numbers of frames
-    EVENTS_ARRAY = []
-
-    for v in range(1,len(response['info']['frames'])):
-        timeStamp = response['info']['frames'][v]['timestamp']
-        TIME = math.floor(timeStamp/(1000*60))
+    events = []
+    frames = response['info']['frames']
+    for frame in frames:
+        time_stamp = frame['timestamp']
+        time = math.floor(time_stamp/(1000*60))
         
         # Catching events
-        for r in range(0,len(response['info']['frames'][v]['events'])): 
+        for event in frame['events']: 
                 # SKILL LEVEL UP
-                if response['info']['frames'][v]['events'][r]['type'] == "SKILL_LEVEL_UP":
-                    PARTICIPANT_ID = int(response['info']['frames'][v]['events'][r]['participantId']) - 1
-                    SKILL = response['info']['frames'][v]['events'][r]['skillSlot']
-                    if SKILL == 1:
-                        SKILL_SLOT = "Q"
-                    elif SKILL == 2:
-                        SKILL_SLOT = "W"
-                    elif SKILL == 3:
-                        SKILL_SLOT= "E"
-                    elif SKILL == 4:
-                        SKILL_SLOT = "R"
+                if event['type'] == "SKILL_LEVEL_UP":
+                    participant_id = int(event['participantId']) - 1
+                    skill = event['skillSlot']
+                    if skill == 1:
+                        skill_slot = "Q"
+                    elif skill == 2:
+                        skill_slot = "W"
+                    elif skill == 3:
+                        skill_slot= "E"
+                    elif skill == 4:
+                        skill_slot = "R"
                     else:
-                        SKILL_SLOT = "Error_404_CODE_SKILL_NOT_FOUND"
+                        skill_slot = "Error_404_CODE_SKILL_NOT_FOUND"
                     
-                    EVENT = "SKILL_LEVEL_UP"
+                    event_action = "SKILL_LEVEL_UP"
                     x = {
-                        "participantId": PARTICIPANTS[PARTICIPANT_ID].name,
-                        "skillSlot": SKILL_SLOT,
-                        "event": EVENT,
-                        "time": str(TIME)
+                        "participantId": participants[participant_id].name,
+                        "skillSlot": skill_slot,
+                        "event": event_action,
+                        "time": str(time)
                     }
-                    EVENTS_ARRAY.append(x)
+                    events.append(x)
 
                 # ITEM PURCHASED
-                if response['info']['frames'][v]['events'][r]['type'] == "ITEM_PURCHASED":
+                if event['type'] == "ITEM_PURCHASED":
                     
-                    PARTICIPANT_ID = int(response['info']['frames'][v]['events'][r]['participantId']) - 1
+                    participant_id = int(event['participantId']) - 1
 
-                    ITEM_ID = response['info']['frames'][v]['events'][r]['itemId']
-                    PARTICIPANT_ID = int(response['info']['frames'][v]['events'][r]['participantId']) - 1
-                    EVENT = "ITEM_PURCHASED"
+                    item_id = event['itemId']
+                    participant_id = int(event['participantId']) - 1
+                    event_action = "ITEM_PURCHASED"
                     x = {
-                        "participantId": PARTICIPANTS[PARTICIPANT_ID].name,
-                        "itemId": str(ITEM_ID),
-                        "event": EVENT,
-                        "time": str(TIME)
+                        "participantId": participants[participant_id].name,
+                        "itemId": str(item_id),
+                        "event": event_action,
+                        "time": str(time)
                     }
-                    EVENTS_ARRAY.append(x)
-                   
-                
-                if len(EVENTS_ARRAY) == 0:
-                    continue
+                    events.append(x)
                                    
-    match = matchObject.objects.filter(matchId=MATCH_ID).get()
-    newMatchTimeLine = matchTimeLineObject()
-    newMatchTimeLine.allEvents = EVENTS_ARRAY
+    match = models.MatchObject.objects.get(match_id=match_id)
+    newMatchTimeLine = models.MatchTimeLineObject()
+    newMatchTimeLine.all_events = events
     newMatchTimeLine.match = match
     newMatchTimeLine.save()
 
-###################################################################################
+############################################################################################################
 # FN TO GET CATEGORY OF GAMES BASED IN THE RIOT API OFICIAL DOCUMENTATION ~ESPECIAL GAMEMODES NOT INCLUDED~
 def getCategory(queueid):
     #REFERENCE LINK
@@ -334,11 +316,10 @@ def matchv5_info(MATCH,NAME):
     
     # GETTING INFO OVER THE MATCHS
     try:
-        matchObject.objects.filter(matchId=MATCH).get()
+        models.MatchObject.objects.get(match_id=MATCH)
         print('Match já existente no bd')
-    except:
-        match_v5_url = f"https://americas.api.riotgames.com/lol/match/v5/matches/{MATCH}?api_key={API_KEY}"
-        response = requests.get(match_v5_url).json()
+    except exceptions.ObjectDoesNotExist:
+        response = RiotLolService().get_matchv5(MATCH).json()
         
         matchv5_timeLine.delay(MATCH,NAME)
         # ID
@@ -351,20 +332,20 @@ def matchv5_info(MATCH,NAME):
 
         # PARTICIPANTS
         PARTICIPANTS = response['info']['participants']
-        NEW_LIST_PARTICIPANTS = []
-        for k in range(0,len(PARTICIPANTS)):
+        new_list_participants = []
+        for participant in PARTICIPANTS:
 
             #SUMMONER
-            SUMMONER_PUUID = PARTICIPANTS[k]['puuid']
-            SUMMONER_ID = PARTICIPANTS[k]['summonerId']
-            PROFILE_ICON = PARTICIPANTS[k]['profileIcon']
-            SUMMONER_LEVEL = PARTICIPANTS[k]['summonerLevel']
-            SUMMONER_NAME = PARTICIPANTS[k]['summonerName']
+            SUMMONER_PUUID = participant['puuid']
+            SUMMONER_ID = participant['summonerId']
+            PROFILE_ICON = participant['profileIcon']
+            SUMMONER_LEVEL = participant['summonerLevel']
+            SUMMONER_NAME = participant['summonerName']
             try:
-                playerObject.objects.update_or_create(puuid=SUMMONER_PUUID,
+                models.PlayerObject.objects.update_or_create(puuid=SUMMONER_PUUID,
                                                      defaults={
                                                         'puuid':SUMMONER_PUUID,
-                                                        'summonerid':SUMMONER_ID,
+                                                        'summoner_id':SUMMONER_ID,
                                                         'name':SUMMONER_NAME.lower(),
                                                         'icon':PROFILE_ICON,
                                                         'level':SUMMONER_LEVEL,})
@@ -374,10 +355,10 @@ def matchv5_info(MATCH,NAME):
                 
             #########################################################
 
-            # CHAMPION E ROLE
-            CHAMPION = PARTICIPANTS[k]['championName']
-            CHAMPION_LEVEL = json.dumps(PARTICIPANTS[k]['champLevel'])
-            ROLE = PARTICIPANTS[k]['teamPosition']
+            # CHAMPION AND ROLE
+            CHAMPION = participant['championName']
+            CHAMPION_LEVEL = json.dumps(participant['champLevel'])
+            ROLE = participant['teamPosition']
             if ROLE == "UTILITY":
                 ROLE = "SUPPORT"
             
@@ -392,22 +373,21 @@ def matchv5_info(MATCH,NAME):
             5008 Adaptive Force (6 AD or 10 AP)
             """
             # STATS_RUNES                         
-            STATS_RUNES_DEFENSE = json.dumps(PARTICIPANTS[k]['perks']['statPerks']['defense']) 
-            STATS_RUNES_FLEX = json.dumps(PARTICIPANTS[k]['perks']['statPerks']['flex'])
-            STATS_RUNES_OFFENSE = json.dumps(PARTICIPANTS[k]['perks']['statPerks']['offense'])
+            STATS_RUNES_DEFENSE = json.dumps(participant['perks']['statPerks']['defense']) 
+            STATS_RUNES_FLEX = json.dumps(participant['perks']['statPerks']['flex'])
+            STATS_RUNES_OFFENSE = json.dumps(participant['perks']['statPerks']['offense'])
 
             # PRINCIPAL RUNES
-            PRINCIPAL_RUNE_STYLE = json.dumps(PARTICIPANTS[k]['perks']['styles'][0]['style'])
-            FIRST_PRINCIPAL_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][0]['selections'][0]['perk'])
-            SECOND_PRINCIPAL_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][0]['selections'][1]['perk'])
-            THIRD_PRINCIPAL_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][0]['selections'][2]['perk'])
-            FOURTH_PRINCIPAL_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][0]['selections'][3]['perk'])
+            PRINCIPAL_RUNE_STYLE = json.dumps(participant['perks']['styles'][0]['style'])
+            FIRST_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][0]['perk'])
+            SECOND_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][1]['perk'])
+            THIRD_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][2]['perk'])
+            FOURTH_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][3]['perk'])
 
             # SECONDARY RUNES
-            SECONDARY_RUNE_STYLE = json.dumps(PARTICIPANTS[k]['perks']['styles'][1]['style'])
-            FIRST_SECONDARY_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][1]['selections'][0]['perk'])
-            # Haha :)
-            SECOND_SECONDARY_RUNE = json.dumps(PARTICIPANTS[k]['perks']['styles'][1]['selections'][1]['perk'])
+            SECONDARY_RUNE_STYLE = json.dumps(participant['perks']['styles'][1]['style'])
+            FIRST_SECONDARY_RUNE = json.dumps(participant['perks']['styles'][1]['selections'][0]['perk'])
+            SECOND_SECONDARY_RUNE = json.dumps(participant['perks']['styles'][1]['selections'][1]['perk'])
 
             # SETTING RUNES DICT
             PRINCIPAL_RUNES = {
@@ -433,32 +413,31 @@ def matchv5_info(MATCH,NAME):
                 "statsRunes":STATS_RUNES
             }
             
-            ##############################################################################################################
             # KDA
-            ASSISTS = PARTICIPANTS[k]['assists']
-            DEATHS = PARTICIPANTS[k]['deaths']
-            KILLS = PARTICIPANTS[k]['kills']
+            ASSISTS = participant['assists']
+            DEATHS = participant['deaths']
+            KILLS = participant['kills']
             if DEATHS == 0:
                 KDA = KILLS + ASSISTS
             else:
                 KDA = round((KILLS + ASSISTS) / DEATHS, 2)
             # DMG,GOLD,ITEMS,WARDS
-            TOTAL_CS = json.dumps(PARTICIPANTS[k]['totalMinionsKilled'] + PARTICIPANTS[k]['neutralMinionsKilled'])
-            TOTAL_DMG = json.dumps(PARTICIPANTS[k]['totalDamageDealtToChampions'])
-            WARDS = json.dumps(PARTICIPANTS[k]['wardsPlaced'])
-            GOLD_EARNED = json.dumps(PARTICIPANTS[k]['goldEarned'])
-            ITEM_0 = json.dumps(PARTICIPANTS[k]['item0'])
-            ITEM_1 = json.dumps(PARTICIPANTS[k]['item1'])
-            ITEM_2 = json.dumps(PARTICIPANTS[k]['item2'])
-            ITEM_3 = json.dumps(PARTICIPANTS[k]['item3'])
-            ITEM_4 = json.dumps(PARTICIPANTS[k]['item4'])
-            ITEM_5 = json.dumps(PARTICIPANTS[k]['item5'])
-            ITEM_6 = json.dumps(PARTICIPANTS[k]['item6'])
+            TOTAL_CS = json.dumps(participant['totalMinionsKilled'] + participant['neutralMinionsKilled'])
+            TOTAL_DMG = json.dumps(participant['totalDamageDealtToChampions'])
+            WARDS = json.dumps(participant['wardsPlaced'])
+            GOLD_EARNED = json.dumps(participant['goldEarned'])
+            ITEM_0 = json.dumps(participant['item0'])
+            ITEM_1 = json.dumps(participant['item1'])
+            ITEM_2 = json.dumps(participant['item2'])
+            ITEM_3 = json.dumps(participant['item3'])
+            ITEM_4 = json.dumps(participant['item4'])
+            ITEM_5 = json.dumps(participant['item5'])
+            ITEM_6 = json.dumps(participant['item6'])
 
             # WIN THE MATCH? = TRUE OR FALSE
-            WIN = json.dumps(PARTICIPANTS[k]['win'])
+            WIN = json.dumps(participant['win'])
 
-            PARTICIPANT = {
+            participant_payload = {
                 "puuid":SUMMONER_PUUID,
                 "summonerName":SUMMONER_NAME,
                 "champion":CHAMPION,
@@ -482,23 +461,23 @@ def matchv5_info(MATCH,NAME):
                 "item6":ITEM_6,
                 "win":WIN
             }
-            NEW_LIST_PARTICIPANTS.append(PARTICIPANT)
+            new_list_participants.append(participant_payload)
 
         # TEAMS
         TEAMS = response['info']['teams']
         NEW_LIST_TEAMS = []
-        for l in range(0,len(TEAMS)):
+        for team in TEAMS:
             # BAN LIST
-            BANS_LIST = TEAMS[l]['bans']
+            BANS_LIST = team['bans']
             BANS = []
-            for m in range(0,len(BANS_LIST)):
+            for ban in BANS_LIST:
                 CHAMPION = {
-                    "championId":json.dumps(BANS_LIST[m]['championId'])
+                    "championId":json.dumps(ban['championId'])
                 }
                 BANS.append(CHAMPION)
 
             # OBJECTIVES
-            OBJECTIVES = TEAMS[l]['objectives']
+            OBJECTIVES = team['objectives']
             # ~
             BARON = json.dumps(OBJECTIVES['baron']['kills'])
             DRAGON = json.dumps(OBJECTIVES['dragon']['kills'])
@@ -508,7 +487,7 @@ def matchv5_info(MATCH,NAME):
             TOWER = json.dumps(OBJECTIVES['tower']['kills'])
 
             # W = T OR F
-            WIN = json.dumps(TEAMS[l]['win'])
+            WIN = json.dumps(team['win'])
             # BANS RETURN A LIST OF BANNED CHAMPION IDS
             TEAM = {
                 "win":WIN,
@@ -523,56 +502,52 @@ def matchv5_info(MATCH,NAME):
             NEW_LIST_TEAMS.append(TEAM)
 
         # saving a new match in the database
-        newObjectMatch = matchObject(matchId=MATCH_ID)
-        newObjectMatch.gameStart = GAME_START
+        newObjectMatch = models.MatchObject(match_id=MATCH_ID)
+        newObjectMatch.game_start = GAME_START
         newObjectMatch.category = CATEGORY
-        newObjectMatch.gameEnding = GAME_ENDING
-        newObjectMatch.gameDuration = GAME_DURATION
-        newObjectMatch.participants = NEW_LIST_PARTICIPANTS
+        newObjectMatch.game_ending = GAME_ENDING
+        newObjectMatch.game_duration = GAME_DURATION
+        newObjectMatch.participants = new_list_participants
         newObjectMatch.teams = NEW_LIST_TEAMS
         newObjectMatch.save()
      
-    ##############################################################
 
 @shared_task
-def match_v5(PUUID,NAME):
-    # GETTING LAST 10 MATCHS
-    MATCH_V5 = f"https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{PUUID}/ids?start=0&count={PLAYER_MATCH_COUNT}&api_key={API_KEY}"
-    response = requests.get(MATCH_V5).json()
-    MATCH_LIST = []
+def match_v5(player_id):
+    player_obj = models.PlayerObject.objects.get(summoner_id=player_id)
+    response = RiotLolService().get_matchv5_list(player_obj.puuid).json()
+    match_list = []
     for match in response:
-        MATCH_LIST.append(match)
-        matchv5_info.delay(match,NAME)
-    return MATCH_LIST
-    ##############################################################
+        match_list.append(match)
+        matchv5_info.delay(match,player_obj.name)
+    player_obj.matchs = match_list
+    player_obj.save()
 
 @shared_task
-def league_v4(ID):
+def league_v4(player_id):
+    player_obj = models.PlayerObject.objects.get(summoner_id=player_id)
     # GETTING RANKED SOLO LEAGUE INFO
-    LEAGUE_V4 = "https://br1.api.riotgames.com/lol/league/v4/entries/by-summoner/" + ID + \
-        "?api_key=" + API_KEY
-    response = requests.get(LEAGUE_V4).json()
+    response = RiotLolService().get_leaguev4(player_id).json()
     QUEUES_INFO = []
-    for x in range(0,len(response)):
-        print(str(len(response)))
-        QUEUE = response[x]['queueType']
+    for league_info in response:
+        QUEUE = league_info['queueType']
         if(QUEUE == "RANKED_TFT_PAIRS"):
            continue
         else:
-            LEAGUE_ID = response[x]['leagueId']
-            TIER = response[x]['tier']
-            RANK = response[x]['rank']
-            LEAGUE_POINTS = json.dumps(response[x]['leaguePoints'])
-            WINS = json.dumps(response[x]['wins'])
-            LOSSES = json.dumps(response[x]['losses'])
+            LEAGUE_ID = league_info['leagueId']
+            TIER = league_info['tier']
+            RANK = league_info['rank']
+            LEAGUE_POINTS = json.dumps(league_info['leaguePoints'])
+            WINS = json.dumps(league_info['wins'])
+            LOSSES = json.dumps(league_info['losses'])
 
             # WIN RATIO
-            totalmatchs = response[x]['wins'] + response[x]['losses']
-            wins = response[x]['wins']
+            wins = league_info['wins']
+
+            totalmatchs = wins + league_info['losses']
 
             WINRATE = json.dumps(round((wins / totalmatchs) * 100, 1))
 
-            ########################
 
             RANKED_INFO = {
                 "LEAGUE_ID": LEAGUE_ID,
@@ -586,51 +561,27 @@ def league_v4(ID):
             }
             QUEUES_INFO.append(RANKED_INFO)
 
-    return QUEUES_INFO
-    ##############################################################
+    player_obj.ranked_solo = QUEUES_INFO
+    player_obj.save()
 
 
 @shared_task
 def summoner_v4(player_name):
     # GETTING ID
-    SUMMONER_V4 = "https://br1.api.riotgames.com/lol/summoner/v4/summoners/by-name/" + player_name + \
-          "?api_key=" + API_KEY
+    response = RiotLolService().get_summonnerv4(player_name).json()
+    player_id = response['id']
+    puuid = response['puuid']
+    name = response['name'].lower()
+    icon_id = response['profileIconId']
+    player_level = response['summonerLevel']
 
-    response = requests.get(SUMMONER_V4).json()
-    ID = response['id']
-    QUEUES_INFO = league_v4.delay(ID)
-    PUUID = response['puuid']
-    NAME = response['name'].lower()
-    MATCH_LIST = match_v5.delay(PUUID,NAME)
-    ICON_ID = response['profileIconId']
-    LEVEL = response['summonerLevel']
+    player_created,created = models.PlayerObject.objects.update_or_create(puuid=puuid,
+                                                                    defaults={
+                                                                    'puuid':puuid,
+                                                                    'summoner_id':player_id,
+                                                                    'name':name.lower(),
+                                                                    'icon':icon_id,
+                                                                    'level':player_level,})
 
-    ##############################################################
-    tasks_not_concluded = False
-    while tasks_not_concluded == False:
-        if(QUEUES_INFO.ready() == True) and (MATCH_LIST.ready() == True):
-            tasks_not_concluded = True
-            PLAYER_CHAMPION_STATISTICS = player_champion_statistics.delay(PUUID)
-        else:
-            time.sleep(3)
-        
-    # saving a new player in the database
-    with allow_join_result():
-        RANKED_SOLO = QUEUES_INFO.get()
-        MATCHS = MATCH_LIST.get()
-        CHAMPIONSTATISTICS = PLAYER_CHAMPION_STATISTICS.get()
-        
-    obj,created = playerObject.objects.update_or_create(puuid=PUUID,
-    defaults={
-        'puuid':PUUID,
-        'summonerid':ID,
-        'name':NAME.lower(),
-        'icon':ICON_ID,
-        'level':LEVEL,
-        'rankedSolo':RANKED_SOLO,
-        'matchs':MATCHS,
-        "championStatistics":CHAMPIONSTATISTICS
-    })
-
-    #############################################################
-    
+    league_v4.delay(player_id)
+    match_v5.delay(player_id)
