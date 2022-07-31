@@ -1,17 +1,18 @@
 import json
 
+from ticorequests import models as ticomodels
 from integrations.services.riotlolapi import RiotLolService
-from ticorequests import models
-from .champion import Champion, ChampionList
-from .match import MatchUtils
-from .dictToJson import dictToJson
+
+from utils.champion import Champion, ChampionList
+from utils.match import MatchUtils
+from utils.dictToJson import dictToJson
 
 class PlayerUtil:
     def __init__(self,player_name: str):
-        self.player = models.PlayerObject.objects.get(name=player_name)
+        self.player = ticomodels.PlayerObject.objects.get(name=player_name)
 
     def get_champion_statistics(self):
-        matchs_queryset = models.MatchObject.objects.all()
+        matchs_queryset = ticomodels.MatchObject.objects.all()
         new_champions = []
         for match in matchs_queryset:
             match_data = MatchUtils(match.match_id).get_match_json()

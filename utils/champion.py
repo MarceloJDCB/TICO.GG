@@ -1,4 +1,3 @@
-import json
 
 class Champion:
     def __init__(self, name, kill, death, assist, win, cs, game_duration):

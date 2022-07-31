@@ -1,7 +1,10 @@
-from ticorequests import models
 from datetime import timedelta, datetime
-from .dictToJson import dictToJson
 from pytz import timezone
+
+from ticorequests import models
+
+from utils.dictToJson import dictToJson
+
 
 class MatchUtils:
     def __init__(self, match_id):

@@ -1,11 +1,11 @@
-from __future__ import absolute_import, unicode_literals
 from django.core import exceptions
 from celery import shared_task
 import json
 import time
-
 import math
-from . import models
+
+from ticorequests import models
+from utils import misc
 from integrations.services.riotlolapi import RiotLolService
 
 @shared_task
@@ -24,10 +24,15 @@ def matchv5_timeLine(match_id):
         time = math.floor(time_stamp/(1000*60))
         
         # Catching events
-        for event in frame['events']: 
-                # SKILL LEVEL UP
+        for event in frame['events']:
+            event_type = event['type']
+            if event_type == "SKILL_LEVEL_UP" or event_type == "ITEM_PURCHASED":
+                event_dict = {}
+                partid = int(event['participantId']) - 1
+                event_dict['participantId'] = partid
+                event_dict['time'] = str(time)
+
                 if event['type'] == "SKILL_LEVEL_UP":
-                    participant_id = int(event['participantId']) - 1
                     skill = event['skillSlot']
                     if skill == 1:
                         skill_slot = "Q"
@@ -39,305 +44,149 @@ def matchv5_timeLine(match_id):
                         skill_slot = "R"
                     else:
                         skill_slot = "Error_404_CODE_SKILL_NOT_FOUND"
-                    
-                    event_action = "SKILL_LEVEL_UP"
-                    x = {
-                        "participantId": participants[participant_id].name,
-                        "skillSlot": skill_slot,
-                        "event": event_action,
-                        "time": str(time)
-                    }
-                    events.append(x)
+                    event_dict['skillSlot'] = skill_slot
+                    event_dict['event'] = "SKILL_LEVEL_UP"
 
-                # ITEM PURCHASED
-                if event['type'] == "ITEM_PURCHASED":
-                    
-                    participant_id = int(event['participantId']) - 1
+                elif event['type'] == "ITEM_PURCHASED":
+                    event_dict['itemId'] = str(event['itemId'])
+                    event_dict['event'] = "ITEM_PURCHASED"
 
-                    item_id = event['itemId']
-                    participant_id = int(event['participantId']) - 1
-                    event_action = "ITEM_PURCHASED"
-                    x = {
-                        "participantId": participants[participant_id].name,
-                        "itemId": str(item_id),
-                        "event": event_action,
-                        "time": str(time)
-                    }
-                    events.append(x)
-                                   
+                events.append(event_dict)
+
     match = models.MatchObject.objects.get(match_id=match_id)
     newMatchTimeLine = models.MatchTimeLineObject()
     newMatchTimeLine.all_events = events
     newMatchTimeLine.match = match
     newMatchTimeLine.save()
 
-############################################################################################################
-# FN TO GET CATEGORY OF GAMES BASED IN THE RIOT API OFICIAL DOCUMENTATION ~ESPECIAL GAMEMODES NOT INCLUDED~
-def getCategory(queueid):
-    #REFERENCE LINK
-    #https://static.developer.riotgames.com/docs/lol/queues.json
-    """
-    420 = 5v5 Ranked Solo
-
-    400 = 5v5 Normal Alternado
-
-    430 = 5v5 Normal Às cegas
-
-    450 = 5v5 ARAM
-
-    440 = 5v5 Ranked Flex
-
-    830 = Coop vs AI Introdução
-
-    840 = Coop vs AI Iniciante
-
-    850 = Coop vs AI Intermediário
-
-    900 = ARURF
-
-    700 = Clash
-    """
-    category = ""
-    if queueid == 420:
-        category = "Ranked Solo"
-        return category
-
-    elif queueid == 400:
-        category = "Normal Alternado"
-        return category
-
-    elif queueid == 430:
-        category = "Normal Às cegas"
-        return category
-
-    elif queueid == 450:
-        category = "ARAM"
-        return category
-
-    elif queueid == 440:
-        category = "Ranked Flex"
-        return category
-
-    elif queueid == 830:
-        category = "Coop vs AI Introdução"
-        return category
-    
-    elif queueid == 840:
-        category = "Coop vs AI Iniciante"
-        return category
-
-    elif queueid == 850:
-        category = "Coop vs AI Intermediário"
-        return category
-
-    elif queueid == 900:
-        category = "ARURF"
-        return category
-
-    elif queueid == 700:
-        category = "Clash"
-        return category
-    else:
-        category = "?"
-        return category
 
 @shared_task
-def matchv5_info(match):
-    
+def matchv5_info(match_id):
     # GETTING INFO OVER THE MATCHS
     try:
-        models.MatchObject.objects.get(match_id=match)
-        print('Match já existente no bd')
-        return 0
+        models.MatchObject.objects.get(match_id=match_id)
+        return print('Match já existente no bd')
     except exceptions.ObjectDoesNotExist:
-        response = RiotLolService().get_matchv5(match).json()
-        
-        matchv5_timeLine.delay(match)
-        # ID
-        MATCH_ID = match
-        # TIME STAMPS
-        CATEGORY = getCategory(response['info']['queueId'])
-        GAME_START = response['info']['gameStartTimestamp']
-        GAME_DURATION = response['info']['gameDuration']
-        GAME_ENDING = response['info']['gameEndTimestamp']
-
-        # PARTICIPANTS
-        PARTICIPANTS = response['info']['participants']
+        response = RiotLolService().get_matchv5(match_id).json()
+        matchv5_timeLine.delay(match_id)
+        participants = response['info']['participants']
         new_list_participants = []
-        for participant in PARTICIPANTS:
-
-            #SUMMONER
-            SUMMONER_PUUID = participant['puuid']
-            SUMMONER_ID = participant['summonerId']
-            PROFILE_ICON = participant['profileIcon']
-            SUMMONER_LEVEL = participant['summonerLevel']
-            SUMMONER_NAME = participant['summonerName']
+        for participant in participants:
+            summoner_puuid = participant['puuid']
+            summoner_name = participant['summonerName']
             try:
-                models.PlayerObject.objects.update_or_create(puuid=SUMMONER_PUUID,
+                models.PlayerObject.objects.update_or_create(puuid=summoner_puuid,
                                                      defaults={
-                                                        'puuid':SUMMONER_PUUID,
-                                                        'summoner_id':SUMMONER_ID,
-                                                        'name':SUMMONER_NAME.lower(),
-                                                        'icon':PROFILE_ICON,
-                                                        'level':SUMMONER_LEVEL,})
+                                                        'puuid':summoner_puuid,
+                                                        'summoner_id':participant['summonerId'],
+                                                        'name':summoner_name.lower(),
+                                                        'icon':participant['profileIcon'],
+                                                        'level':participant['summonerLevel'],})
             except Exception as er:
-                print(SUMMONER_NAME)
+                print(f"{summoner_name} raised {str(er)}")
                 pass
                 
-            # CHAMPION AND ROLE
-            CHAMPION = participant['championName']
-            CHAMPION_LEVEL = json.dumps(participant['champLevel'])
-            ROLE = participant['teamPosition']
-            if ROLE == "UTILITY":
-                ROLE = "SUPPORT"
-            
-
-            # RUNES
-            """
-            5001 Scaling Health (15-90 HP, lvls 1-18)
-            5002 Armor (5 Armor)
-            5003 Magic Resist (6 MR)
-            5005 Attack Speed (9% Attack Speed)
-            5007 Scaling Cooldown Reduction (1-10% CDR, lvls 1-18)
-            5008 Adaptive Force (6 AD or 10 AP)
-            """
             # STATS_RUNES                         
-            STATS_RUNES_DEFENSE = json.dumps(participant['perks']['statPerks']['defense']) 
-            STATS_RUNES_FLEX = json.dumps(participant['perks']['statPerks']['flex'])
-            STATS_RUNES_OFFENSE = json.dumps(participant['perks']['statPerks']['offense'])
+            stats_runes_defense = json.dumps(participant['perks']['statPerks']['defense']) 
+            stats_runes_flex = json.dumps(participant['perks']['statPerks']['flex'])
+            stats_runes_offense = json.dumps(participant['perks']['statPerks']['offense'])
 
             # PRINCIPAL RUNES
-            PRINCIPAL_RUNE_STYLE = json.dumps(participant['perks']['styles'][0]['style'])
-            FIRST_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][0]['perk'])
-            SECOND_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][1]['perk'])
-            THIRD_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][2]['perk'])
-            FOURTH_PRINCIPAL_RUNE = json.dumps(participant['perks']['styles'][0]['selections'][3]['perk'])
+            principal_rune_style = json.dumps(participant['perks']['styles'][0]['style'])
+            first_principal_rune = json.dumps(participant['perks']['styles'][0]['selections'][0]['perk'])
+            second_principal_rune = json.dumps(participant['perks']['styles'][0]['selections'][1]['perk'])
+            third_principal_rune = json.dumps(participant['perks']['styles'][0]['selections'][2]['perk'])
+            fourth_principal_rune = json.dumps(participant['perks']['styles'][0]['selections'][3]['perk'])
 
             # SECONDARY RUNES
-            SECONDARY_RUNE_STYLE = json.dumps(participant['perks']['styles'][1]['style'])
-            FIRST_SECONDARY_RUNE = json.dumps(participant['perks']['styles'][1]['selections'][0]['perk'])
-            SECOND_SECONDARY_RUNE = json.dumps(participant['perks']['styles'][1]['selections'][1]['perk'])
+            secondary_rune_style = json.dumps(participant['perks']['styles'][1]['style'])
+            first_secondary_rune = json.dumps(participant['perks']['styles'][1]['selections'][0]['perk'])
+            second_secondary_rune = json.dumps(participant['perks']['styles'][1]['selections'][1]['perk'])
 
-            # SETTING RUNES DICT
-            PRINCIPAL_RUNES = {
-                "principalRuneStyle":PRINCIPAL_RUNE_STYLE,
-                "1PrincipalRune":FIRST_PRINCIPAL_RUNE,
-                "2PrincipalRune":SECOND_PRINCIPAL_RUNE,
-                "3PrincipalRune":THIRD_PRINCIPAL_RUNE,
-                "4PrincipalRune":FOURTH_PRINCIPAL_RUNE
-            }
-            SECONDARY_RUNES = {
-                "secondaryRuneStyle":SECONDARY_RUNE_STYLE,
-                "1SecondaryRune":FIRST_SECONDARY_RUNE,
-                "2SecondaryRune":SECOND_SECONDARY_RUNE,
-            }
-            STATS_RUNES = {
-                "statRuneAttack":STATS_RUNES_OFFENSE,
-                "statRuneDefense":STATS_RUNES_DEFENSE,
-                "statRuneFlex":STATS_RUNES_FLEX,
-            }
-            RUNES = {
-                "principalRunes":PRINCIPAL_RUNES,
-                "secondaryRunes":SECONDARY_RUNES,
-                "statsRunes":STATS_RUNES
-            }
-            
-            # KDA
-            ASSISTS = participant['assists']
-            DEATHS = participant['deaths']
-            KILLS = participant['kills']
-            if DEATHS == 0:
-                KDA = KILLS + ASSISTS
-            else:
-                KDA = round((KILLS + ASSISTS) / DEATHS, 2)
-            # DMG,GOLD,ITEMS,WARDS
-            TOTAL_CS = json.dumps(participant['totalMinionsKilled'] + participant['neutralMinionsKilled'])
-            TOTAL_DMG = json.dumps(participant['totalDamageDealtToChampions'])
-            WARDS = json.dumps(participant['wardsPlaced'])
-            GOLD_EARNED = json.dumps(participant['goldEarned'])
-            ITEM_0 = json.dumps(participant['item0'])
-            ITEM_1 = json.dumps(participant['item1'])
-            ITEM_2 = json.dumps(participant['item2'])
-            ITEM_3 = json.dumps(participant['item3'])
-            ITEM_4 = json.dumps(participant['item4'])
-            ITEM_5 = json.dumps(participant['item5'])
-            ITEM_6 = json.dumps(participant['item6'])
+           
+            # kda kill death assists
+            assists = participant['assists']
+            deaths = participant['deaths']
+            kills = participant['kills']
 
-            # WIN THE MATCH? = TRUE OR FALSE
-            WIN = json.dumps(participant['win'])
+            role = participant['teamPosition']
 
             participant_payload = {
-                "puuid":SUMMONER_PUUID,
-                "summonerName":SUMMONER_NAME,
-                "champion":CHAMPION,
-                "championLevel":CHAMPION_LEVEL,
-                "role":ROLE,
-                "cs":TOTAL_CS,
-                "runes":RUNES,
-                "assists":json.dumps(ASSISTS),
-                "deaths":json.dumps(DEATHS),
-                "kills":json.dumps(KILLS),
-                "kda":json.dumps(KDA),
-                "totalDmg":TOTAL_DMG,
-                "wards":WARDS,
-                "goldEarned":GOLD_EARNED,
-                "item0":ITEM_0,
-                "item1":ITEM_1,
-                "item2":ITEM_2,
-                "item3":ITEM_3,
-                "item4":ITEM_4,
-                "item5":ITEM_5,
-                "item6":ITEM_6,
-                "win":WIN
+                "puuid":summoner_puuid,
+                "summonerName":summoner_name,
+                "champion":participant['championName'],
+                "championLevel":json.dumps(participant['champLevel']),
+                "role":role if role != "UTILITY" else "SUPPORT",
+                "cs":json.dumps(participant['totalMinionsKilled'] + participant['neutralMinionsKilled']),
+                "runes":{
+                    "principalRunes":{
+                        "principalRuneStyle":principal_rune_style,
+                        "1PrincipalRune":first_principal_rune,
+                        "2PrincipalRune":second_principal_rune,
+                        "3PrincipalRune":third_principal_rune,
+                        "4PrincipalRune":fourth_principal_rune
+                        },
+                    "secondaryRunes":{
+                        "secondaryRuneStyle":secondary_rune_style,
+                        "1SecondaryRune":first_secondary_rune,
+                        "2SecondaryRune":second_secondary_rune,
+                        },
+                    "statsRunes": {
+                        "statRuneAttack":stats_runes_offense,
+                        "statRuneDefense":stats_runes_defense,
+                        "statRuneFlex":stats_runes_flex,
+                        }
+                    },
+                "assists":json.dumps(assists),
+                "deaths":json.dumps(deaths),
+                "kills":json.dumps(kills),
+                "kda":json.dumps(kills + assists if deaths == 0 else round((kills + assists) / deaths, 2)),
+                "totalDmg":json.dumps(participant['totalDamageDealtToChampions']),
+                "wards":json.dumps(participant['wardsPlaced']),
+                "goldEarned":json.dumps(participant['goldEarned']),
+                "item0":json.dumps(participant['item0']),
+                "item1":json.dumps(participant['item1']),
+                "item2":json.dumps(participant['item2']),
+                "item3":json.dumps(participant['item3']),
+                "item4":json.dumps(participant['item4']),
+                "item5":json.dumps(participant['item5']),
+                "item6":json.dumps(participant['item6']),
+                "win":json.dumps(participant['win'])
             }
             new_list_participants.append(participant_payload)
 
         # TEAMS
-        TEAMS = response['info']['teams']
-        NEW_LIST_TEAMS = []
-        for team in TEAMS:
+        new_list_teams = []
+        for team in response['info']['teams']:
             # BAN LIST
-            BANS_LIST = team['bans']
-            BANS = []
-            for ban in BANS_LIST:
-                CHAMPION = {
+            bans = []
+            for ban in team['bans']:
+                champion = {
                     "championId":json.dumps(ban['championId'])
                 }
-                BANS.append(CHAMPION)
+                bans.append(champion)
 
-            # OBJECTIVES
-            OBJECTIVES = team['objectives']
-            # ~
-            BARON = json.dumps(OBJECTIVES['baron']['kills'])
-            DRAGON = json.dumps(OBJECTIVES['dragon']['kills'])
-            RIFTHERALD = json.dumps(OBJECTIVES['riftHerald']['kills'])
-            KILLS = json.dumps(OBJECTIVES['champion']['kills'])
-            INHIBITOR = json.dumps(OBJECTIVES['inhibitor']['kills'])
-            TOWER = json.dumps(OBJECTIVES['tower']['kills'])
-
-            # W = T OR F
-            WIN = json.dumps(team['win'])
             # BANS RETURN A LIST OF BANNED CHAMPION IDS
-            TEAM = {
-                "win":WIN,
-                "bans":BANS,
-                "barons":BARON,
-                "dragons":DRAGON,
-                "riftheralds":RIFTHERALD,
-                "kills":KILLS,
-                "inhibitor":INHIBITOR,
-                "towers":TOWER
+            team_dict = {
+                "win":json.dumps(team['win']),
+                "bans":bans,
+                "barons":json.dumps(team['objectives']['baron']['kills']),
+                "dragons":json.dumps(team['objectives']['dragon']['kills']),
+                "riftheralds":json.dumps(team['objectives']['riftHerald']['kills']),
+                "kills":json.dumps(team['objectives']['champion']['kills']),
+                "inhibitor":json.dumps(team['objectives']['inhibitor']['kills']),
+                "towers":json.dumps(team['objectives']['tower']['kills'])
             }
-            NEW_LIST_TEAMS.append(TEAM)
+            new_list_teams.append(team_dict)
 
         # saving a new match in the database
-        newObjectMatch = models.MatchObject(match_id=MATCH_ID)
-        newObjectMatch.game_start = GAME_START
-        newObjectMatch.category = CATEGORY
-        newObjectMatch.game_ending = GAME_ENDING
-        newObjectMatch.game_duration = GAME_DURATION
+        newObjectMatch = models.MatchObject(match_id=match_id)
+        newObjectMatch.game_start = response['info']['gameStartTimestamp']
+        newObjectMatch.category = misc.get_game_category(response['info']['queueId'])
+        newObjectMatch.game_ending = response['info']['gameEndTimestamp']
+        newObjectMatch.game_duration = response['info']['gameDuration']
         newObjectMatch.participants = new_list_participants
-        newObjectMatch.teams = NEW_LIST_TEAMS
+        newObjectMatch.teams = new_list_teams
         newObjectMatch.save()
      
 
@@ -361,7 +210,6 @@ def match_v5(player_id):
 
 @shared_task
 def summoner_v4(player_name):
-    # GETTING ID
     response = RiotLolService().get_summonnerv4(player_name).json()
     player_id = response['id']
     puuid = response['puuid']
