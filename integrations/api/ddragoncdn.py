@@ -1,7 +1,9 @@
-from integrations.config.ddragoncdn import DragonCdnConfig
 from rest_framework.response import Response
 from rest_framework import status
 import requests
+
+from integrations.config.ddragoncdn import DragonCdnConfig
+from integrations.models.riot import BaseApiCall
 
 class DragonCdnApi:
     def __init__(self):
@@ -23,11 +25,36 @@ class DragonCdnApi:
             response = requests.request(
                 method,
                 url,
-                data=data
+                data=data,
             )
-            if response.status_code != 200:
-                return Response(data={"error":"Connection to dragon api was not successful"},status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            if response.status_code in [200,201]:
+                BaseApiCall.objects.create(
+                    api="DRAGON_CDN",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=True,
+                    response_status_code=response.status_code,
+                    response_data=response.json()
+                )
+            else:
+                BaseApiCall.objects.create(
+                    api="DRAGON_CDN",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=True,
+                    response_status_code=response.status_code,
+                    response_data=response.json()
+                )
         except Exception as er:
-            raise(er)
-
+            BaseApiCall.objects.create(
+                    api="DRAGON_CDN",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=False,
+                    response_status_code=response.status_code or None,
+                    response_data=f"{er} / {response.json()}"
+                )
         return response

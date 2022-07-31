@@ -10,6 +10,7 @@ router.register(r'matchs', views.matchViewSet)
 
 urlpatterns = [
     url(r'^', include(router.urls)),
+    url('get_test',views.TestView.get_test),
     url('requestPlayer',views.requestPlayerView.request_player),
     url('getPlayer',views.requestPlayerView.get_player),
     url('getRune',views.runeView.get_rune),

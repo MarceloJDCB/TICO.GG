@@ -1,12 +1,11 @@
-from ticorequests.models import MatchObject,MatchTimeLineObject
-from datetime import timedelta
+from ticorequests import models
+from datetime import timedelta, datetime
 from .dictToJson import dictToJson
 from pytz import timezone
-import datetime
 
 class MatchUtils:
     def __init__(self, match_id):
-        self.match = MatchObject.objects.get(match_id=match_id)
+        self.match = models.MatchObject.objects.get(match_id=match_id)
     
     def get_match_json(self):
         time_ago,game_duration = self.calculate_match_ending_days_and_game_duration()
@@ -68,7 +67,7 @@ class MatchUtils:
 
 class MatchTimelineUtils:
     def __init__(self, match_id):
-        self.match_timeline = MatchTimeLineObject.objects.get(match_id=match_id)
+        self.match_timeline = models.MatchTimeLineObject.objects.get(match_id=match_id)
     
     def format_events_textfield(self):
         return dictToJson(self.match_timeline.all_events)

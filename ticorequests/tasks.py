@@ -1,185 +1,15 @@
 from __future__ import absolute_import, unicode_literals
+from django.core import exceptions
 from celery import shared_task
 import json
-import requests
 import time
+
 import math
 from . import models
-from celery.result import allow_join_result
-from utils import match
 from integrations.services.riotlolapi import RiotLolService
-from django.core import exceptions
 
 @shared_task
-def player_champion_statistics(player_puuid):
-    class Champion:
-        def __init__(self, name, kill, death, assist, win, cs, gameduration):
-            self.name = name
-            self.kill = float(kill)
-            self.death = float(death)
-            self.assist = float(assist)
-            self.win = win
-            self.cs = cs
-            self.gameduration = gameduration
-
-    matchs = models.MatchObject.objects.all()
-    new_champs = []
-    for match_data in matchs:
-        match_utils = match.MatchUtils(match_data.match_id)
-        data = match_utils.get_match_json()
-        if data['category'] == "Ranked Solo":
-            for participant in data['participants']:
-                if participant['puuid'] == player_puuid:
-                    name = participant['champion']
-                    kills = participant['kills']
-                    deaths = participant['deaths']
-                    assists = participant['assists']
-                    cs = float(participant['cs'])
-
-                    str_game_duration = str(data['gameDuration'])
-                    game_duration = ""
-                    for char in str_game_duration:
-                        if char == ":":
-                            break
-                        else:
-                            game_duration = game_duration + char
-                    game_duration = float(game_duration)
-                    win = data['participants'][i]['win']
-                    new_champs.append(Champion(name,kills,deaths,assists,win,cs,game_duration))
-        
-    # Ordering the champions
-    def get_atr_name(c):    
-        return c.name
-    new_list = []
-    b = 0
-    new_champs.sort(key=get_atr_name)
-    for champ in new_champs:
-
-        #ACTUAL
-        name = champ.name
-        kills = champ.kill
-        deaths = champ.death
-        assists = champ.assist
-        cs = champ.cs
-        gameduration = champ.gameduration
-        win = champ.win
-        if b > 0:
-            #OLD
-            oldname = new_champs[b-1].name
-            if name == oldname:
-                for list in new_list:
-                    if list['champion'] == name:
-                        list['kills'] = kills + list['kills']
-                        list['deaths'] = deaths + list['deaths']
-                        list['assists'] = assists + list['assists']
-                        list['cs'] = cs + list['cs']
-                        list['gameduration'] = gameduration + list['gameduration']
-                        if win == "true":
-                            list['wins'] = list['wins'] + 1
-                        else:
-                            list['losses'] = list['losses'] + 1
-                        list['qntd'] = list['qntd'] + 1
-                        break
-                    else:
-                        continue
-            else:
-                if win == "true":
-                    x = {
-                        "champion":name,
-                        "kills":kills,
-                        "deaths":deaths,
-                        "assists":assists,
-                        "cs":cs,
-                        "gameduration":gameduration,
-                        "wins":1,
-                        "losses":0,
-                        "winrate":0,
-                        "kda":0,
-                        "qntd":1
-                    }
-                else:
-                    x = {
-                    "champion":name,
-                    "kills":kills,
-                    "deaths":deaths,
-                    "assists":assists,
-                    "cs":cs,
-                    "gameduration":gameduration,
-                    "wins":0,
-                    "losses":1,
-                    "winrate":0,
-                    "kda":0,
-                    "qntd":1
-                    }
-                new_list.append(x)
-        else:
-            if win == "true":
-                x = {
-                    "champion":name,
-                    "kills":kills,
-                    "deaths":deaths,
-                    "assists":assists,
-                    "cs":cs,
-                    "gameduration":gameduration,
-                    "wins":1,
-                    "losses":0,
-                    "winrate":0,
-                    "kda":0,
-                    "qntd":1
-                }
-            else:
-                x = {
-                "champion":name,
-                "kills":kills,
-                "deaths":deaths,
-                "assists":assists,
-                "cs":cs,
-                "gameduration":gameduration,
-                "wins":0,
-                "losses":1,
-                "winrate":0,
-                "kda":0,
-                "qntd":1
-                }
-            new_list.append(x)
-        b += 1
-
-    for list in new_list:
-       #VARIAVEIS PARA OPERAÇÕES MATEMÁTICAS   
-        list['kills'] = (round(list['kills'] / list['qntd'], 1))
-        list['deaths'] = (round(list['deaths'] / list['qntd'], 1))
-        list['assists'] = (round(list['assists'] / list['qntd'], 1))
-        list['cs'] = (round(list['cs'] / list['gameduration'],1))
-        list['gameduration'] = (round(list['gameduration'] / 60, 1))
-        list['wins'] = (list['wins'])
-        list['losses'] = (list['losses'])
-        list['qntd'] = (list['qntd'])
-        list['winrate'] = ((list['wins'] / list['qntd']) * 100)
-
-        # KDA (Kill/Death/Assistance) is the sum of kills and assists divided by the number of deaths
-        if list['deaths'] == 0:
-            list['kda'] = str(list['assists'] + list['kills'])
-        else:
-            list['kda'] = str((list['assists'] + list['kills']) / list['deaths'])[0:4]
-
-
-        # variables that will be given to the final list
-        list['kills'] = str(list['kills'])
-        list['deaths'] = str(list['deaths'])
-        list['assists'] = str(list['assists'])
-        list['cs'] = str(list['cs'])
-        list['gameduration'] = str(list['gameduration'])
-        list['wins'] = str(list['wins'])
-        list['losses'] = str(list['losses'])
-        list['qntd'] = str(list['qntd'])
-        
-        list['winrate'] = str(list['winrate'])
-
-    return(new_list)
-
-
-@shared_task
-def matchv5_timeLine(match_id,requestplayer):
+def matchv5_timeLine(match_id):
     response = RiotLolService().get_matchv5_timeline(match_id).json()
     participants = []
     participants_payload = response['metadata']['participants']
@@ -312,18 +142,19 @@ def getCategory(queueid):
         return category
 
 @shared_task
-def matchv5_info(MATCH,NAME):
+def matchv5_info(match):
     
     # GETTING INFO OVER THE MATCHS
     try:
-        models.MatchObject.objects.get(match_id=MATCH)
+        models.MatchObject.objects.get(match_id=match)
         print('Match já existente no bd')
+        return 0
     except exceptions.ObjectDoesNotExist:
-        response = RiotLolService().get_matchv5(MATCH).json()
+        response = RiotLolService().get_matchv5(match).json()
         
-        matchv5_timeLine.delay(MATCH,NAME)
+        matchv5_timeLine.delay(match)
         # ID
-        MATCH_ID = MATCH
+        MATCH_ID = match
         # TIME STAMPS
         CATEGORY = getCategory(response['info']['queueId'])
         GAME_START = response['info']['gameStartTimestamp']
@@ -353,8 +184,6 @@ def matchv5_info(MATCH,NAME):
                 print(SUMMONER_NAME)
                 pass
                 
-            #########################################################
-
             # CHAMPION AND ROLE
             CHAMPION = participant['championName']
             CHAMPION_LEVEL = json.dumps(participant['champLevel'])
@@ -517,52 +346,17 @@ def match_v5(player_id):
     player_obj = models.PlayerObject.objects.get(summoner_id=player_id)
     response = RiotLolService().get_matchv5_list(player_obj.puuid).json()
     match_list = []
+    matchv5_info_tasks = []
     for match in response:
         match_list.append(match)
-        matchv5_info.delay(match,player_obj.name)
+        matchv5_info_task = matchv5_info.delay(match)
+        matchv5_info_tasks.append(matchv5_info_task)
     player_obj.matchs = match_list
     player_obj.save()
 
-@shared_task
-def league_v4(player_id):
-    player_obj = models.PlayerObject.objects.get(summoner_id=player_id)
-    # GETTING RANKED SOLO LEAGUE INFO
-    response = RiotLolService().get_leaguev4(player_id).json()
-    QUEUES_INFO = []
-    for league_info in response:
-        QUEUE = league_info['queueType']
-        if(QUEUE == "RANKED_TFT_PAIRS"):
-           continue
-        else:
-            LEAGUE_ID = league_info['leagueId']
-            TIER = league_info['tier']
-            RANK = league_info['rank']
-            LEAGUE_POINTS = json.dumps(league_info['leaguePoints'])
-            WINS = json.dumps(league_info['wins'])
-            LOSSES = json.dumps(league_info['losses'])
-
-            # WIN RATIO
-            wins = league_info['wins']
-
-            totalmatchs = wins + league_info['losses']
-
-            WINRATE = json.dumps(round((wins / totalmatchs) * 100, 1))
-
-
-            RANKED_INFO = {
-                "LEAGUE_ID": LEAGUE_ID,
-                "QUEUE":QUEUE,
-                "TIER":TIER,
-                "RANK":RANK,
-                "LEAGUE_POINTS":LEAGUE_POINTS,
-                "WINS":WINS,
-                "LOSSES":LOSSES,
-                "WINRATE": WINRATE
-            }
-            QUEUES_INFO.append(RANKED_INFO)
-
-    player_obj.ranked_solo = QUEUES_INFO
-    player_obj.save()
+    while matchv5_info_tasks[-1].ready() == False:
+        time.sleep(0.3)
+    player_obj.get_champion_statistics()
 
 
 @shared_task
@@ -583,5 +377,7 @@ def summoner_v4(player_name):
                                                                     'icon':icon_id,
                                                                     'level':player_level,})
 
-    league_v4.delay(player_id)
+    player_created.get_solo_league_info()
     match_v5.delay(player_id)
+
+    

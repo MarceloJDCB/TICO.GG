@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # my apps
     'ticorequests',
+    "integrations",
     # third party apps
     "corsheaders",
     'rest_framework',

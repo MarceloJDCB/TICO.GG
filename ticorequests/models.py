@@ -1,6 +1,8 @@
 from django.conf import settings
-from integrations.services.ddragoncdn import DragonCdnService
 from django.db import models
+
+from integrations.services.ddragoncdn import DragonCdnService
+from utils.player import PlayerUtil
 
 class PlayerObject(models.Model):
 	puuid = models.CharField(max_length=100)
@@ -11,6 +13,15 @@ class PlayerObject(models.Model):
 	ranked_solo = models.TextField()
 	championStatistics = models.TextField()
 	matchs = models.TextField()
+
+	def get_solo_league_info(self):
+		self.ranked_solo = PlayerUtil(self.name).get_solo_league_info()
+		super(PlayerObject, self).save()
+
+	def get_champion_statistics(self):
+		self.championStatistics = PlayerUtil(self.name).get_champion_statistics()
+		super(PlayerObject, self).save()
+
 
 class ItemObject(models.Model):
 	item_id = models.CharField(max_length=100)

@@ -11,8 +11,16 @@ from ticorequests import serializers
 from django.core import exceptions
 from utils import match, player, item, rune
 
+class TestView(APIView):
+    @api_view(('GET',))
+    def get_test(request):
+        xxx = models.PlayerObject.objects.get(name='fã do takeshi')
+        xxx.get_champion_statistics()
+        print(xxx.championStatistics)
+        return Response(data={"ok"})
 
 class requestPlayerView(APIView):
+
     @api_view(('POST',))
     def request_player(request):
         params = request.data
@@ -31,7 +39,7 @@ class requestPlayerView(APIView):
 
 class playerViewSet(viewsets.ModelViewSet):
     
-    queryset = models.PlayerObject.objects.filter(name="grevzin")
+    queryset = models.PlayerObject.objects.all()
     serializer_class = playerSerializer
    
 class matchViewSet(viewsets.ModelViewSet):

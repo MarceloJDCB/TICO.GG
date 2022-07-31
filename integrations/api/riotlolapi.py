@@ -1,8 +1,10 @@
-from integrations.config.riotlolapi import RiotApiConfig
 from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
 import requests
+
+from integrations.config.riotlolapi import RiotApiConfig
+from integrations.models.riot import BaseApiCall
 
 class RiotLolApi:
     def __init__(self):
@@ -15,7 +17,6 @@ class RiotLolApi:
     def get_league_v4(self,player_id):
         url = f"{self.riot_config.br1_base_api_link}/league/v4/entries/by-summoner/{player_id}"
         return self.riot_request(url,'','GET')
-
     
     def get_matchv5_timeline(self,match_id):
         url = f"{self.riot_config.america_base_api_link}/match/v5/matches/{match_id}/timeline"
@@ -50,9 +51,36 @@ class RiotLolApi:
                 data=data,
                 headers=headers
             )
-            if response.status_code != 200:
-                return Response(data={"error":"Connection to riot api was not successful"},status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+            if response.status_code in [200,201]:
+                BaseApiCall.objects.create(
+                    api="RIOT",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=True,
+                    response_status_code=response.status_code,
+                    response_data=response.json()
+                )
+            else:
+                BaseApiCall.objects.create(
+                    api="RIOT",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=False,
+                    response_status_code=response.status_code,
+                    response_data=response.json()
+                )
         except Exception as er:
-            raise(er)
+            BaseApiCall.objects.create(
+                    api="RIOT",
+                    method=method,
+                    url=url,
+                    data=data,
+                    success=False,
+                    response_status_code=response.status_code or None,
+                    response_data=f"{er} / {response.json()}"
+                )
 
         return response
