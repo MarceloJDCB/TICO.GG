@@ -10,20 +10,11 @@ router.register(r'matchs', views.matchViewSet)
 
 urlpatterns = [
     url(r'^', include(router.urls)),
-    url('index',views.index),
-    url(r'summoner/(?P<summoner>[\w\s]+)/$',views.summoner),
-    url(r'getplayermatchs/(?P<summoner>[-\w]+)/$',views.matchs),
-    url(r'getunrankedplayermatchs/(?P<summoner>[-\w]+)/$',views.matchs_unranked),
-    
-
-    url('test',views.test),
-
-
+    url('get_test',views.TestView.get_test),
     url('requestPlayer',views.requestPlayerView.request_player),
+    url('getPlayer',views.requestPlayerView.get_player),
     url('getRune',views.runeView.get_rune),
     url('getItem',views.itemView.get_item),
     url('getMatch',views.matchView.get_match),
-    url('getTimeLine',views.matchTimeLinePlayerView.getTimeLine)
-
-
+    url('getTimeLine',views.matchTimeLinePlayerView.get_time_line)
 ]

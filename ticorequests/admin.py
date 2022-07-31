@@ -1,10 +1,10 @@
 from django.contrib import admin
-from .models import playerObject,matchObject,runesObject,matchTimeLineObject,itemObject
+from . import models
 
-admin.site.register(playerObject)
-admin.site.register(matchObject)
-admin.site.register(matchTimeLineObject)
-admin.site.register(runesObject)
-admin.site.register(itemObject)
+admin.site.register(models.PlayerObject)
+admin.site.register(models.MatchObject)
+admin.site.register(models.MatchTimeLineObject)
+admin.site.register(models.RunesObject)
+admin.site.register(models.ItemObject)
 
 

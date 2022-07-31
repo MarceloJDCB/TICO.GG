@@ -17,8 +17,8 @@ from django.contrib import admin
 from django.urls import include, path, re_path
 
 urlpatterns = [
+    path('jet/', include('jet.urls', 'jet')),  # Django JET URLS
+    path('jet/dashboard/', include('jet.dashboard.urls', 'jet-dashboard')),  # Django JET dashboard URLS
     path('admin/', admin.site.urls),
     path('', include('ticorequests.urls')),
-    re_path(r'^celery-progress/', include('celery_progress.urls'))
-    
 ]
