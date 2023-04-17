@@ -7,7 +7,7 @@
 ##   Vamos começar respondendo algumas perguntas que você possa ter em mente
 
 #### 1. P: Quem é você e por que você resolveu publicar esse protótipo de api baseada em estatística de lol open source?
-#### R: Meu nome é Marcelo, tenho 20 anos e adoro programar :) . Resolvi fazer este projeto por conta de um insight que tive com um amigo após de descobrir que a api da Riot era aberta para quem quisesse explorar e criar projetos de grande porte ou apenas para uso pessoal, ambos chegamos a conclusão que seria muito diferenciado ter um projeto envolvendo data analysis de lol =D (Descobri pouco tempo depois que iria me custar algumas horas de sono e um pouquinho de cabelo hehehe...)
+#### R: Meu nome é Marcelo, tenho 21* anos e adoro programar :) . Resolvi fazer este projeto por conta de um insight que tive com um amigo após de descobrir que a api da Riot era aberta para quem quisesse explorar e criar projetos de grande porte ou apenas para uso pessoal, ambos chegamos a conclusão que seria muito diferenciado ter um projeto envolvendo data analysis de lol =D (Descobri pouco tempo depois que iria me custar algumas horas de sono e um pouquinho de cabelo hehehe...)
 #### 2. P: Você é um programador experiente?
 #### R: Profissionalmente tenho poucos meses de experiência porém eu já tenho ciência do que é programação desde os 11 anos de idade (fazia códigos bobinhos em vb.net) e estudo de uma maneira séria desde 2017. Sendo sincero fiz este protótipo inteiro a base de café, documentações (Django, Celery, Python e RIOT API) e stackoverflow (e alguns outros sites de artigos de programação).
 #### 3. P: Quem é tico?
